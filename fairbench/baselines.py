@@ -76,6 +76,9 @@ def mcmc_swap_sample(u: Universe, cs: ConstraintSet, shots: int, burn_in: int, t
     accept iff feasible (symmetric proposal -> uniform stationary law on the
     feasible set). Returns `shots` states after burn_in, every `thin` moves.
     cost = burn_in + shots*thin moves; info['accepted_moves'] = accepted swaps."""
+    if shots < 0 or thin < 1 or burn_in < 0:
+        raise ValueError(f"need shots>=0, thin>=1, burn_in>=0; got shots={shots}, "
+                         f"thin={thin}, burn_in={burn_in}")
     n, k = u.n, _k(cs)
     rng = np.random.default_rng(seed)
     if x0 is None:

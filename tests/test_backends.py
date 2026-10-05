@@ -66,3 +66,14 @@ def test_unknown_backend():
 def test_bitstrings_to_array():
     out = bitstrings_to_array(["001 10", "00001"], 5)
     assert out.tolist() == [[0, 1, 1, 0, 0], [1, 0, 0, 0, 0]]
+
+
+def test_partial_dict_raises_and_param_order():
+    from fairbench.backends import ansatz_param_order
+    a, b = Parameter("a"), Parameter("b")
+    qc = QuantumCircuit(1)
+    qc.rx(a, 0)
+    qc.ry(b, 0)
+    assert ansatz_param_order(qc) == ["a", "b"]
+    with pytest.raises(ValueError, match="b"):
+        sample(qc, {a: 0.1}, 4, seed=0)

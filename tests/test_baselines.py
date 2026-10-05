@@ -100,3 +100,32 @@ def test_metrics_toy():
     assert cost_per_feasible_sample(10, 4) == 2.5
     assert cost_per_feasible_sample(10, 0) == float("inf")
     assert 0 < tv_expected_uniform(20, 1000, seed=0) < 0.2
+
+
+def test_swap_components():
+    from fairbench.metrics import swap_components
+    full = np.array([[1 if i in c else 0 for i in range(5)]
+                     for c in itertools.combinations(range(5), 2)], dtype=np.uint8)
+    assert swap_components(full) == 1
+    islands = np.array([[1, 1, 0, 0, 0, 0], [1, 0, 1, 0, 0, 0],
+                        [0, 0, 0, 1, 1, 0], [0, 0, 0, 1, 0, 1]], dtype=np.uint8)
+    assert swap_components(islands) == 2
+
+
+def test_mcmc_validation(setup):
+    u, cs = setup[0], setup[1]
+    for kw in ({"shots": -1, "burn_in": 0, "thin": 1}, {"shots": 1, "burn_in": 0, "thin": 0},
+               {"shots": 1, "burn_in": -1, "thin": 1}):
+        with pytest.raises(ValueError):
+            mcmc_swap_sample(u, cs, seed=0, **kw)
+
+
+def test_metrics_dedup_and_empty():
+    F = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1]], dtype=np.uint8)
+    Fdup = np.vstack([F, F])
+    assert tv_to_uniform(F, Fdup) == pytest.approx(0.0)
+    assert coverage(F, Fdup) == pytest.approx(1.0)
+    with pytest.raises(ValueError):
+        tv_to_uniform(F, np.zeros((0, 3), dtype=np.uint8))
+    with pytest.raises(ValueError):
+        coverage(F, np.zeros((0, 3), dtype=np.uint8))

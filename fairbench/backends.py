@@ -23,7 +23,20 @@ def bitstrings_to_array(bitstrings: list[str], n: int) -> np.ndarray:
     return out
 
 
+def ansatz_param_order(circuit: QuantumCircuit) -> list[str]:
+    """Parameter names in the order a sequence of values is bound (Qiskit's name-sorted order)."""
+    return [p.name for p in circuit.parameters]
+
+
 def _bind(circuit: QuantumCircuit, params) -> QuantumCircuit:
+    bound = _bind_raw(circuit, params)
+    if bound.parameters:
+        names = sorted(p.name for p in bound.parameters)
+        raise ValueError(f"circuit still has unbound parameters after binding: {names}")
+    return bound
+
+
+def _bind_raw(circuit: QuantumCircuit, params) -> QuantumCircuit:
     if params is None:
         if circuit.parameters:
             raise ValueError("circuit has unbound parameters but params=None")

@@ -12,7 +12,7 @@ from fairbench.baselines import (enumerate_feasible, mcmc_swap_sample,
 from fairbench.constraints import Cardinality, ConstraintSet, MinESG, SectorCap
 from fairbench.data import synthetic_universe
 from fairbench.metrics import (acceptance_rate, cost_per_feasible_sample, coverage,
-                               tv_expected_uniform, tv_to_uniform)
+                               swap_components, tv_expected_uniform, tv_to_uniform)
 from fairbench.quantum.ansatz import build_ansatz
 
 
@@ -29,7 +29,9 @@ def main():
     u = synthetic_universe(n=n, n_sectors=3, seed=0)
     # MinESG threshold: 70th percentile of avg ESG over all k-subsets (deterministic).
     avgs = np.array([u.esg_score[list(c)].mean() for c in itertools.combinations(range(n), k)])
-    m = float(np.quantile(avgs, 0.70))
+    # Subtract 1e-9 so subsets whose avg equals the quantile are not lost to float
+    # rounding at the >= boundary (keeps the feasible set stable across platforms).
+    m = float(np.quantile(avgs, 0.70)) - 1e-9
     cons = [Cardinality(k)] + [SectorCap(s, 2) for s in sorted(set(u.sector))] + [MinESG(m)]
     cs = ConstraintSet(cons)
     print(f"n={n} k={k} sectors={sorted(set(u.sector))} shots={a.shots} seed={a.seed}")
@@ -38,15 +40,16 @@ def main():
     F = enumerate_feasible(u, cs)
     M = len(F)
     total = math.comb(n, k)
-    print(f"Feasible set: M = {M}, M/C({n},{k}) = {M}/{total} = {M/total:.3f}\n")
+    print(f"Feasible set: M = {M}, M/C({n},{k}) = {M}/{total} = {M/total:.3f}")
+    print(f"Swap-connectivity: {swap_components(F)} component(s) (1 = no MCMC islands on this instance)\n")
 
     rows = []
 
-    def add(name, feas, acc, cost, unit):
+    def add(name, feas, acc, cost, unit, move_acc=None):
         nf = len(feas)
         rows.append((name, acc, nf, tv_to_uniform(feas, F) if nf else float("nan"),
                      tv_expected_uniform(M, nf, seed=a.seed) if nf else float("nan"),
-                     coverage(feas, F), cost_per_feasible_sample(cost, nf), unit))
+                     coverage(feas, F), cost_per_feasible_sample(cost, nf), unit, move_acc))
 
     # (a) Dicke p=0 on aer_statevector + filter; cost = shots
     qc = build_ansatz(n, k, 0, None)
@@ -57,29 +60,34 @@ def main():
 
     # (b) rejection
     rj = rejection_sample(u, cs, a.shots, seed=a.seed)
-    acc_r = rj.info["n_accepted"] / a.shots
+    acc_r = rj.info["n_accepted"] / rj.cost
     add("rejection", rj.samples, acc_r, rj.cost, rj.cost_unit)
 
     # (c) MCMC: requests as many states as rejection kept feasible, so n_feasible matches.
     n_target = max(len(rj.samples), 1)
     mc = mcmc_swap_sample(u, cs, n_target, a.burn_in, a.thin, seed=a.seed)
-    add("mcmc_swap", mc.samples, 1.0, mc.cost, mc.cost_unit)
+    add("mcmc_swap", mc.samples, None, mc.cost, mc.cost_unit,
+        move_acc=mc.info["accepted_moves"] / mc.cost)
 
     # (d) classical random k-subsets + filter (sanity)
     Xc = random_k_subsets(n, k, a.shots, seed=a.seed + 1)
     okc = cs.check_batch(Xc, u)
     add("classical_k+filter", Xc[okc], float(okc.mean()), a.shots, "shots")
 
-    hdr = ["sampler", "acceptance", "n_feasible", "TV_to_unif", "TV_floor", "coverage", "cost/feasible"]
+    hdr = ["sampler", "acceptance", "move_acc", "n_feasible", "TV_to_unif", "TV_floor", "coverage", "cost/feasible"]
     lines = [hdr]
     for r in rows:
-        lines.append([r[0], f"{r[1]:.3f}", str(r[2]), f"{r[3]:.4f}", f"{r[4]:.4f}",
+        lines.append([r[0], "n/a" if r[1] is None else f"{r[1]:.3f}",
+                      "n/a" if r[8] is None else f"{r[8]:.3f}", str(r[2]), f"{r[3]:.4f}", f"{r[4]:.4f}",
                       f"{r[5]:.3f}", f"{r[6]:.2f} {r[7]}/feasible"])
     w = [max(len(l[i]) for l in lines) for i in range(len(hdr))]
     for i, l in enumerate(lines):
         print("  ".join(c.ljust(w[j]) for j, c in enumerate(l)))
         if i == 0:
             print("  ".join("-" * x for x in w))
+
+    print("TV_floor assumes i.i.d. samples; MCMC samples are autocorrelated (thin=T), "
+          "so its TV sits above the floor from fewer effective samples, not bias.")
 
     p = (acc_d + acc_r) / 2
     se = math.sqrt(max(p * (1 - p), 1e-12) * 2 / a.shots)
