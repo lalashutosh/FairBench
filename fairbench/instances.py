@@ -1,20 +1,13 @@
 """Benchmark instances: the P0 toy instance and an "island" instance.
 
-Island instance (why swap chains get trapped)
----------------------------------------------
-A swap replaces one held asset i by a non-held j; the sums of ESG and carbon
-shift by (e_j - e_i, c_j - c_i). MinESG (sum ESG >= a) and CarbonCap (sum carbon
-<= b) are two opposing half-planes; when ESG and carbon are positively
-correlated across assets, the feasible region in (ESG, carbon) space is a thin
-wedge near the corner (a, b). Moving between two feasible portfolios that
-differ in two names needs two swaps; of the two orders, one first adds ESG
-(and carbon) -> breaks the CarbonCap, the other first removes carbon (and ESG)
--> breaks MinESG. Both intermediates are infeasible, and per-sector caps
-remove further paths. The feasible set splits into swap-disconnected islands;
-a Metropolis swap chain (reject infeasible) never crosses, while rejection
-sampling and the Dicke circuit (all weight-k states) reach every island.
-Average-based rules are linear in the sums, so the two intermediates always sum
-to the endpoints: the midpoint is feasible, the single steps are not.
+Island instance
+---------------
+islands = which sector holds the singleton (sector mixes (2,1,2) [29] and (1,2,2) [26]).
+Every single cross-island swap breaks the ESG floor, the carbon cap, or a sector cap;
+removing any one rule type (SectorCap, MinESG, CarbonCap) reconnects the set. ESG and
+carbon are positively correlated (0.81). A Metropolis swap chain (reject infeasible)
+never crosses; rejection sampling and the Dicke circuit (all weight-k states) reach
+both islands.
 """
 from __future__ import annotations
 
@@ -115,9 +108,11 @@ ISLAND_PARAMS: dict = dict(n=16, k=5, seed=29, n_sectors=3, cap=2, esg_q=0.85, c
 
 
 def island_instance(seed: int = 0, n: int | None = None, k: int | None = None) -> tuple[Universe, ConstraintSet]:
-    """Deterministic island instance (2 swap components). The hard-coded
-    ISLAND_PARAMS are used; ``seed`` is accepted for interface symmetry but
-    ignored. n/k override only for experimentation (islands not guaranteed)."""
+    """Deterministic island instance (2 swap components) from ISLAND_PARAMS. ``seed`` is kept
+    for API stability but must be 0 (ValueError otherwise). n/k override only for
+    experimentation (islands not guaranteed)."""
+    if seed != 0:
+        raise ValueError("island_instance is fixed (ISLAND_PARAMS); seed must be 0")
     p = dict(ISLAND_PARAMS)
     if n is not None:
         p["n"] = n

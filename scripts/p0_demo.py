@@ -9,8 +9,8 @@ import numpy as np
 from fairbench.backends import sample
 from fairbench.baselines import (enumerate_feasible, mcmc_swap_sample,
                                  random_k_subsets, rejection_sample)
-from fairbench.constraints import Cardinality, ConstraintSet, MinESG, SectorCap
-from fairbench.data import synthetic_universe
+from fairbench.constraints import MinESG
+from fairbench.instances import p0_instance
 from fairbench.metrics import (acceptance_rate, cost_per_feasible_sample, coverage,
                                swap_components, tv_expected_uniform, tv_to_uniform)
 from fairbench.quantum.ansatz import build_ansatz
@@ -25,15 +25,9 @@ def main():
     a = ap.parse_args()
     t0 = time.time()
 
-    n, k = 12, 4
-    u = synthetic_universe(n=n, n_sectors=3, seed=0)
-    # MinESG threshold: 70th percentile of avg ESG over all k-subsets (deterministic).
-    avgs = np.array([u.esg_score[list(c)].mean() for c in itertools.combinations(range(n), k)])
-    # Subtract 1e-9 so subsets whose avg equals the quantile are not lost to float
-    # rounding at the >= boundary (keeps the feasible set stable across platforms).
-    m = float(np.quantile(avgs, 0.70)) - 1e-9
-    cons = [Cardinality(k)] + [SectorCap(s, 2) for s in sorted(set(u.sector))] + [MinESG(m)]
-    cs = ConstraintSet(cons)
+    u, cs = p0_instance()
+    n, k = u.n, cs.cardinality
+    m = next(c.min_avg_score for c in cs.constraints if isinstance(c, MinESG))
     print(f"n={n} k={k} sectors={sorted(set(u.sector))} shots={a.shots} seed={a.seed}")
     print(f"MinESG threshold m = {m:.4f} (70th percentile of avg ESG over all k-subsets)")
 

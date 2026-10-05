@@ -7,16 +7,15 @@ from fairbench.metrics import coverage, swap_components
 
 
 def test_p0_instance_matches_demo():
-    import itertools
-    from fairbench.constraints import Cardinality, ConstraintSet, SectorCap
-    from fairbench.data import synthetic_universe
+    import importlib.util, pathlib
+    spec = importlib.util.spec_from_file_location(
+        "p0_demo", pathlib.Path(__file__).parents[1] / "scripts" / "p0_demo.py")
+    demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(demo)
     u, cs = p0_instance()
-    # independent rebuild of scripts/p0_demo.py's instance
-    u2 = synthetic_universe(n=12, n_sectors=3, seed=0)
-    avgs = np.array([u2.esg_score[list(c)].mean() for c in itertools.combinations(range(12), 4)])
-    m = float(np.quantile(avgs, 0.70)) - 1e-9
-    cs2 = ConstraintSet([Cardinality(4)] + [SectorCap(s, 2) for s in sorted(set(u2.sector))] + [MinESG(m)])
-    assert np.array_equal(enumerate_feasible(u, cs), enumerate_feasible(u2, cs2))
+    assert demo.p0_instance is p0_instance  # demo uses the shared instance, no copy
+    from fairbench.training import p0_instance as tp0
+    assert tp0 is p0_instance
     d = describe_instance(u, cs)
     assert d["n_components"] == 1 and d["M"] == 120 and d["total"] == 495
 
@@ -37,5 +36,22 @@ def test_mcmc_trapped_rejection_covers():
     mc = mcmc_swap_sample(u, cs, 3000, 200, 5, seed=0, x0=x0)
     cov_mc = coverage(mc.samples, F)
     assert cov_mc <= d["largest_frac"] + 1e-9
+    assert cov_mc >= 0.3  # chain does move within its island
     rj = rejection_sample(u, cs, 300_000, seed=0)
     assert coverage(rj.samples, F) > 0.95
+
+
+def test_island_seed_must_be_zero():
+    import pytest
+    with pytest.raises(ValueError):
+        island_instance(seed=1)
+
+
+def test_dropping_any_rule_type_reconnects():
+    from fairbench.constraints import CarbonCap, ConstraintSet, SectorCap
+    from fairbench.metrics import swap_components
+    u, cs = island_instance()
+    assert swap_components(enumerate_feasible(u, cs)) == 2
+    for typ in (SectorCap, MinESG, CarbonCap):
+        cs2 = ConstraintSet([c for c in cs.constraints if not isinstance(c, typ)])
+        assert swap_components(enumerate_feasible(u, cs2)) == 1, typ.__name__

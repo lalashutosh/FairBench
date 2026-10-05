@@ -3,6 +3,11 @@
 Per (n, p): sample 2048 shots on aer_mps with bond_dim in CHIS; compare against a reference
 (exact Statevector probs for n<=20, else unbounded aer_mps). Also records the true max bond dim
 of the unbounded MPS (save_matrix_product_state).
+
+chi_weightk = smallest chi preserving Hamming weight (>=0.999) -- necessary, not sufficient, for
+accurate simulation; TV check disabled when ref-vs-ref TV >= 0.5.
+Caveats: params are random (trained params at n=12 p=2 gave the same bond 29); the instance here
+differs from the ablation instances; for n>=24 the reference is an unbounded MPS, not independent truth.
 """
 from __future__ import annotations
 
@@ -118,25 +123,25 @@ def main():
         df["chi_label"] = df.chi.map(lambda c: c if c else "None")
     df.to_csv(os.path.join(a.out, "mps_sweep.csv"), index=False)
 
-    # chi needed
+    # chi_weightk
     need = []
     for (n, p), g in df.groupby(["n", "p"]):
         g = g.sort_values("chi")
         gb = g[g.chi > 0]
-        # chi needed: weight-k >= 0.999 for this chi and every larger chi; TV within 1.5x ref-ref
+        # chi_weightk: weight-k >= 0.999 for this chi and every larger chi; TV within 1.5x ref-ref
         # floor only where that floor is informative (tv_refref < 0.5; at larger n sampling noise saturates TV).
         good = (gb.wk_rate >= 0.999) & ((gb.tv_refref >= 0.5) | (gb.tv <= 1.5 * gb.tv_refref))
         good = good[::-1].cummin()[::-1].astype(bool)
         ok = gb[good]
         chi_need = int(ok.chi.min()) if len(ok) else None  # None -> > 64
         unb = g[g.chi == 0].iloc[0]
-        need.append(dict(n=n, p=p, true_maxbond=int(g.true_maxbond.iloc[0]), chi_needed=chi_need if chi_need else ">64",
+        need.append(dict(n=n, p=p, true_maxbond=int(g.true_maxbond.iloc[0]), chi_weightk=chi_need if chi_need else ">64",
                          wall_unbounded=unb.wall_s,
                          wall_at_need=float(ok.iloc[0].wall_s) if len(ok) else float(unb.wall_s)))
     nd = pd.DataFrame(need)
     print(nd.to_string(index=False))
     print(df[["n", "p", "chi_label", "wall_s", "wk_rate", "tv", "tv_refref", "e_err"]].round(4).to_string(index=False))
-    nd.to_csv(os.path.join(a.out, "mps_chi_needed.csv"), index=False)
+    nd.to_csv(os.path.join(a.out, "mps_chi_weightk.csv"), index=False)
 
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -150,8 +155,8 @@ def main():
     for p in sorted(nd.p.unique()):
         g = nd[nd.p == p]
         ax[1].plot(g.n, g.wall_at_need, "o-", label=f"p={p}")
-    ax[1].set_yscale("log"); ax[1].set_xlabel("n qubits"); ax[1].set_ylabel("wall time of 2048 shots at needed chi (s)")
-    ax[1].set_title("MPS sampling time (unbounded if chi>64)"); ax[1].legend()
+    ax[1].set_yscale("log"); ax[1].set_xlabel("n qubits"); ax[1].set_ylabel("wall time of 2048 shots at chi_weightk (s)")
+    ax[1].set_title("MPS sampling time (unbounded if chi_weightk>64)"); ax[1].legend()
     fig.tight_layout(); fig.savefig(os.path.join(a.out, "mps_sweep.png"), dpi=130)
     print(f"total {time.time()-t_start:.0f}s")
 

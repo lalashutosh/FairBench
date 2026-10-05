@@ -10,14 +10,14 @@ Modes
   This is what hardware would do. Cost is counted in shots.
 * ``exact=True``: evaluates ``objective_fn.exact(probs)`` on ``Statevector`` probabilities.
   SIMULATION SHORTCUT (n <= ~16): noise-free, zero shots, not available on hardware. Its
-  ``n_shots_total`` is 0; ``shots_equiv`` reports what the same number of evaluations would
-  have cost at ``shots`` per evaluation.
+  ``n_shots_total`` is 0; ``shots_equiv`` = exact-mode evals x shots (lower bound; sampled
+  chi^2 at island P_F needs far more shots).
 
 Parameters are always bound by dict ``{Parameter: value}``; the internal vector order is
 ``list(ansatz.parameters)`` (Qiskit's name-sorted order: beta before gamma), but nothing
 here relies on that order beyond being consistent within one call.
 
-Optimizers: COBYLA (scipy; ``maxiter`` = max objective evaluations) and SPSA (own seeded
+Optimizers: COBYLA (scipy; ``maxiter`` -> maxiter+1 evals per start: initial + final re-eval, as observed) and SPSA (own seeded
 implementation, Spall 1998 gains with step calibration; ``maxiter`` = iterations, 2 evals each
 plus 2*n_calib=10 calibration evals).
 """
@@ -48,7 +48,7 @@ class TrainResult:
     final_value: float = float("nan")   # objective at returned params (exact if exact mode)
     optimizer: str = ""
     exact: bool = False
-    shots_equiv: int = 0          # n_evals * shots (hardware cost of same run)
+    shots_equiv: int = 0          # exact-mode evals x shots (lower bound; sampled chi^2 at island P_F needs far more)
     n_starts: int = 1
 
 
@@ -212,18 +212,7 @@ def train_multistart(ansatz: QuantumCircuit, objective_fn, n_starts: int = 4,
 # --------------------------------------------------------------------------
 # P1 experiment
 # --------------------------------------------------------------------------
-def p0_instance():
-    """The P0 instance: synthetic_universe(12,3,seed=0), k=4, SectorCap 2/sector,
-    MinESG at the 70th percentile of k-subset average ESG minus 1e-9 (as in p0_demo)."""
-    from .constraints import Cardinality, ConstraintSet, MinESG, SectorCap
-    from .data import synthetic_universe
-    n, k = 12, 4
-    u = synthetic_universe(n=n, n_sectors=3, seed=0)
-    avgs = np.array([u.esg_score[list(c)].mean() for c in itertools.combinations(range(n), k)])
-    m = float(np.quantile(avgs, 0.70)) - 1e-9
-    cs = ConstraintSet([Cardinality(k)] + [SectorCap(s, 2) for s in sorted(set(u.sector))]
-                       + [MinESG(m)])
-    return u, cs
+from .instances import p0_instance  # noqa: E402,F401  (re-export; single definition lives in instances)
 
 
 def p1_training_experiment(seed: int = 0, ps=(1, 2, 3), lams=(0.0, 0.05, 0.5),

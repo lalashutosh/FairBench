@@ -70,11 +70,35 @@ def test_repair_deterministic():
     assert np.array_equal(a, b)
 
 
-def test_violation_zero_iff_feasible():
+def test_raw_violation_zero_iff_feasible():
+    """Raw formula (pre-masking): ==0 exactly where feasible, >0 where not (also wrong-weight rows)."""
+    from fairbench.postprocess import _raw_violation_batch
     u, cs = _instance()
-    X = _rand_k(300, 5)
-    from fairbench.postprocess import violation_batch
-    assert np.array_equal(violation_batch(X, cs, u) == 0, cs.check_batch(X, u))
+    rng = np.random.default_rng(5)
+    X = np.vstack([_rand_k(300, 5), (rng.random((300, N)) < 0.35).astype(np.uint8)])
+    raw = _raw_violation_batch(X, cs, u)
+    ok = cs.check_batch(X, u)
+    assert ok.any() and (~ok).any()
+    assert np.all(raw[ok] <= 1e-9) and np.all(raw[~ok] > 0)
+    assert np.array_equal(raw > 1e-9, ~ok)
+
+
+def test_violation_decreases_after_repairing_swap():
+    from fairbench.postprocess import _raw_violation_batch
+    u, cs = _instance()
+    F = enumerate_feasible(u, cs)
+    x = F[0].copy()
+    # break MinESG/sector cap: swap a held asset for the lowest-ESG non-held one
+    held, free = np.flatnonzero(x == 1), np.flatnonzero(x == 0)
+    i = held[np.argmax(u.esg_score[held])]
+    j = free[np.argmin(u.esg_score[free])]
+    bad = x.copy(); bad[i], bad[j] = 0, 1
+    assert not cs.check(bad, u)
+    v_bad = _raw_violation_batch(bad[None], cs, u)[0]
+    assert v_bad > 0
+    assert _raw_violation_batch(x[None], cs, u)[0] <= 1e-9 < v_bad  # swapping back repairs it
+    y, was = repair(bad, cs, u, seed=0)
+    assert was and _raw_violation_batch(y[None], cs, u)[0] <= 1e-9
 
 
 def test_weights():

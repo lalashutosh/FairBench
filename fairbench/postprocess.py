@@ -28,8 +28,8 @@ def _avg_violation(X: np.ndarray, values: np.ndarray, bound: float, lower: bool)
     return np.where(cnt > 0, np.maximum(gap, 0.0) / scale, 1.0)  # empty -> 1
 
 
-def violation_batch(X: np.ndarray, cs: ConstraintSet, u: Universe) -> np.ndarray:
-    """(m,) total normalised violation; 0 iff feasible (exactly, via check_batch fallback)."""
+def _raw_violation_batch(X: np.ndarray, cs: ConstraintSet, u: Universe) -> np.ndarray:
+    """(m,) total normalised violation BEFORE the feasibility mask (0 iff feasible, up to float)."""
     X = np.atleast_2d(np.asarray(X)).astype(np.int64, copy=False)
     tot = np.zeros(X.shape[0])
     for c in cs.constraints:
@@ -47,6 +47,13 @@ def violation_batch(X: np.ndarray, cs: ConstraintSet, u: Universe) -> np.ndarray
             tot += _avg_violation(X, u.carbon, c.max_avg, lower=False)
         else:  # unknown constraint: 0/1
             tot += (~c.check_batch(X, u)).astype(float)
+    return tot
+
+
+def violation_batch(X: np.ndarray, cs: ConstraintSet, u: Universe) -> np.ndarray:
+    """(m,) total normalised violation; 0 iff feasible (exactly, via check_batch fallback)."""
+    X = np.atleast_2d(np.asarray(X)).astype(np.int64, copy=False)
+    tot = _raw_violation_batch(X, cs, u)
     # guard: numerical edge (e.g. avg slightly below bound by float error) must agree with check
     bad = ~cs.check_batch(X, u)
     return np.where(bad, np.maximum(tot, 1e-9), 0.0)
