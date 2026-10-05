@@ -86,8 +86,8 @@ def main():
         if i == 0:
             print("  ".join("-" * x for x in w))
 
-    print("TV_floor assumes i.i.d. samples; MCMC samples are autocorrelated (thin=T), "
-          "so its TV sits above the floor from fewer effective samples, not bias.")
+    print("TV_floor assumes i.i.d. samples; MCMC samples are autocorrelated "
+          f"(thin={a.thin}), so its TV sits above the floor from fewer effective samples, not bias.")
 
     p = (acc_d + acc_r) / 2
     se = math.sqrt(max(p * (1 - p), 1e-12) * 2 / a.shots)
