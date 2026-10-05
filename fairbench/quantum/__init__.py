@@ -1,0 +1,1 @@
+"""Problem-agnostic quantum core."""

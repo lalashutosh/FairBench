@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fairbench"
+version = "0.1.0"
+description = "Constraint-aware random-portfolio benchmarking with constraint-preserving quantum circuits"
+requires-python = ">=3.11"
+dependencies = ["qiskit>=1.0", "qiskit-aer", "numpy", "pandas", "scipy", "matplotlib"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["fairbench*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
