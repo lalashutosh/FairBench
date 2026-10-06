@@ -132,3 +132,113 @@ def describe_instance(u: Universe, cs: ConstraintSet) -> dict:
     return dict(n=u.n, k=k, M=M, total=total, feasible_fraction=M / total,
                 n_components=len(sizes), component_sizes=sizes,
                 largest_frac=(sizes[0] / M) if M else float("nan"))
+
+
+_FAMILY_CACHE: dict = {}
+
+
+def island_family_legacy(n: int, k: int | None = None, seed: int = 0, n_seeds: int = 40,
+                  n_sectors_opts=(3, 4), caps=(2, 3), esg_qs=(0.5, 0.7, 0.85),
+                  carbon_qs=(0.2, 0.35, 0.5, 0.65)) -> tuple[Universe, ConstraintSet]:
+    """LEGACY (Q-B results): per-n grid search over construction params, so instances at
+    different n come from DIFFERENT constructions and a size trend over them is not
+    meaningful. Use ``island_family`` for new work.
+
+    Island-style instance at size n (default k = n//3): same construction as
+    ``island_instance`` (``_build``: sector caps + opposing MinESG/CarbonCap tight
+    quantiles on correlated ESG/carbon). Deterministic grid search over
+    (sectors, cap, esg_q, carbon_q) x universe seeds ``seed..seed+n_seeds-1``.
+    Preference (tiered): (1) >=2 swap components, M >= 20, second component >= 5 and
+    largest <= 0.7 M, biggest M first; (2) any >=2 components, biggest M first;
+    (3) no islands found: the largest-M non-trivial instance (check
+    ``describe_instance`` -> n_components; nothing is faked).
+    (n, k, seed) == (16, 5, 0) returns ``island_instance()``."""
+    k = n // 3 if k is None else k
+    if (n, k, seed) == (16, 5, 0):
+        return island_instance()
+    key = (n, k, seed, n_seeds, tuple(n_sectors_opts), tuple(caps), tuple(esg_qs), tuple(carbon_qs))
+    if key not in _FAMILY_CACHE:
+        best = {1: None, 2: None, 3: None}
+        for n_sec, cap, eq, cq in itertools.product(n_sectors_opts, caps, esg_qs, carbon_qs):
+            if n_sec * cap < k:
+                continue
+            for s in range(seed, seed + n_seeds):
+                u, cs = _build(n, k, n_sec, s, cap, eq, cq)
+                F = enumerate_feasible(u, cs)
+                M = len(F)
+                if M < 2:
+                    continue
+                sizes = _component_sizes(F)
+                if len(sizes) >= 2 and M >= 20 and sizes[1] >= 5 and sizes[0] <= 0.7 * M:
+                    tier = 1
+                elif len(sizes) >= 2:
+                    tier = 2
+                else:
+                    tier = 3
+                if best[tier] is None or M > best[tier][0]:
+                    best[tier] = (M, (n_sec, s, cap, eq, cq))
+        pick = next(best[t] for t in (1, 2, 3) if best[t] is not None)
+        _FAMILY_CACHE[key] = pick[1]
+    n_sec, s, cap, eq, cq = _FAMILY_CACHE[key]
+    return _build(n, k, n_sec, s, cap, eq, cq)
+
+
+# Fixed construction for island_family (same for every n and seed). Chosen by a scan over
+# sector levels / residual scale / quantiles (k=5, 3 sectors, cap 2) maximising the fraction
+# of universe seeds with >= 2 swap components (second >= 3) at n = 12, 14, 16.
+FAMILY_PARAMS: dict = dict(k=5, n_sectors=3, cap=2, esg_levels=(70.0, 40.0, 50.0),
+                           carbon_levels=(250.0, 80.0, 200.0), sigma=10.0, gamma=6.0,
+                           esg_q=0.5, carbon_q=0.5)
+
+
+def _build_family(n: int, k: int, seed: int, n_sectors: int, cap: int, esg_levels, carbon_levels,
+                  sigma: float, gamma: float, esg_q: float, carbon_q: float):
+    """Designed island construction. Sector levels are FIXED (sector 0: clean ESG / high
+    carbon, sector 1: low ESG / low carbon, sector 2: in between); the seed only draws the
+    base universe (sector labels, returns) and asset residuals z_i ~ N(0,1):
+        esg_i    = E[s_i] + sigma * z_i
+        carbon_i = C[s_i] + gamma * sigma * z_i + N(0, sigma)
+    (strong positive within-sector ESG/carbon correlation). Rules: SectorCap(cap) per
+    sector, MinESG and CarbonCap at quantiles esg_q / carbon_q of the averages over
+    sector-cap-feasible k-subsets. With k = 2*n_sectors - 1 every portfolio is "all sectors
+    at cap but one"; ESG-tight and carbon-tight sector mixes need opposite residuals, so a
+    single cross-mix swap breaks one of the two average rules -> swap islands."""
+    if len(esg_levels) != n_sectors or len(carbon_levels) != n_sectors:
+        raise ValueError("esg_levels / carbon_levels must have n_sectors entries")
+    u = synthetic_universe(n=n, n_sectors=n_sectors, seed=seed)
+    r = np.random.default_rng(seed + 7)
+    si = np.array([int(s[1:]) for s in u.sector])
+    z = r.normal(0.0, 1.0, n)
+    u.esg_score = np.clip(np.asarray(esg_levels, float)[si] + sigma * z, 0, 100)
+    u.carbon = np.clip(np.asarray(carbon_levels, float)[si] + gamma * sigma * z
+                       + r.normal(0.0, sigma, n), 10, 500)
+    base = [Cardinality(k)] + [SectorCap(f"S{i}", cap) for i in range(n_sectors)]
+    comb = np.array(list(itertools.combinations(range(n), k)))
+    X = np.zeros((len(comb), n), np.uint8)
+    np.put_along_axis(X, comb, 1, 1)
+    cb = comb[ConstraintSet(base).check_batch(X, u)]
+    m = float(np.quantile(u.esg_score[cb].mean(1), esg_q)) - 1e-9
+    cc = float(np.quantile(u.carbon[cb].mean(1), carbon_q)) + 1e-9
+    return u, ConstraintSet(base + [MinESG(m), CarbonCap(cc)])
+
+
+def island_family(n: int, k: int | None = None, seed: int = 0) -> tuple[Universe, ConstraintSet]:
+    """Island-family instance of size n with FIXED construction params (``FAMILY_PARAMS``)
+    for every n and seed; ``seed`` only varies the random universe (``_build_family``).
+    Default k = FAMILY_PARAMS["k"] = 5 for all n (other k: islands not by design).
+
+    Islands are typical but NOT guaranteed (nothing is filtered or faked): check
+    ``describe_instance(u, cs)["n_components"]``. Seeds 0..9: >= 2 components with second
+    component >= 3 for 8/10 (n=12), 9/10 (n=14), 9/10 (n=16); seed 6 is connected at
+    n=14,16. Components are often several (fragmented), not exactly two. Intended for
+    n >= 12: at n = 8, 10 (k=5 fixed) M <= 11 and the instances are degenerate.
+    For a size trend, report all
+    seeds (or the seeds that are islanded at every n) rather than cherry-picking.
+    For the pre-fix per-n grid-searched instances (Q-B), see ``island_family_legacy``."""
+    p = dict(FAMILY_PARAMS)
+    if k is not None:
+        p["k"] = int(k)
+    if n < p["k"] + 1:
+        raise ValueError(f"need n > k; got n={n}, k={p['k']}")
+    return _build_family(n, p["k"], seed, p["n_sectors"], p["cap"], p["esg_levels"],
+                         p["carbon_levels"], p["sigma"], p["gamma"], p["esg_q"], p["carbon_q"])

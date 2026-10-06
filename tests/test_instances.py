@@ -55,3 +55,32 @@ def test_dropping_any_rule_type_reconnects():
     for typ in (SectorCap, MinESG, CarbonCap):
         cs2 = ConstraintSet([c for c in cs.constraints if not isinstance(c, typ)])
         assert swap_components(enumerate_feasible(u, cs2)) == 1, typ.__name__
+
+
+def test_island_family_fixed_params_deterministic():
+    from fairbench.instances import FAMILY_PARAMS, island_family
+    a, b = island_family(14, seed=3), island_family(14, seed=3)
+    assert np.array_equal(a[0].esg_score, b[0].esg_score)
+    assert [vars(c) for c in a[1].constraints].__repr__() == [vars(c) for c in b[1].constraints].__repr__()
+    assert np.array_equal(enumerate_feasible(*a), enumerate_feasible(*b))
+    c = island_family(14, seed=4)
+    assert not np.array_equal(a[0].esg_score, c[0].esg_score)  # seed varies the universe
+    for n in (12, 16):  # same construction (k, sectors, cap) at every n
+        u, cs = island_family(n, seed=0)
+        assert cs.cardinality == FAMILY_PARAMS["k"] and len(set(u.sector)) == FAMILY_PARAMS["n_sectors"]
+
+
+def test_island_family_islands_typical():
+    from fairbench.instances import island_family
+    good = 0
+    for s in range(5):
+        d = describe_instance(*island_family(14, seed=s))
+        good += d["n_components"] >= 2 and d["component_sizes"][1] >= 3
+    assert good >= 4
+
+
+def test_island_family_legacy_kept():
+    from fairbench.instances import island_family_legacy
+    u, cs = island_family_legacy(16, 5, 0)
+    u0, cs0 = island_instance()
+    assert np.array_equal(u.esg_score, u0.esg_score)

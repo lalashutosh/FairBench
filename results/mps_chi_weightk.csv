@@ -1,4 +1,4 @@
-n,p,true_maxbond,chi_weightk,wall_unbounded,wall_at_need
+n,p,true_maxbond,chi_weightk,wall_unbounded,wall_at_chi_weightk
 12,0,5,8,0.1011393070220947,0.1012263298034668
 12,1,29,32,0.1176323890686035,0.119511604309082
 12,2,29,32,0.1369426250457763,0.1509666442871093

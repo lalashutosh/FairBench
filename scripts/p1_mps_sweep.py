@@ -65,15 +65,39 @@ def true_bond(circ, params):
     return max([int((np.asarray(l) > 1e-10).sum()) for l in mps[1]] + [1]), time.time() - t
 
 
+def make_plot(df, nd, out, ps):
+    import matplotlib; matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+    for n in sorted(df.n.unique()):
+        g = df[(df.n == n) & (df.p == max(ps))].sort_values("chi")
+        g = g[g.chi > 0]
+        ax[0].plot(g.chi, g.wk_rate, "o-", label=f"n={n}")
+    ax[0].set_xscale("log", base=2); ax[0].set_xlabel("max bond dim chi"); ax[0].set_ylabel("weight-k rate")
+    ax[0].set_title(f"Hamming-weight preservation (p={max(ps)})"); ax[0].legend()
+    for p in sorted(nd.p.unique()):
+        g = nd[nd.p == p]
+        ax[1].plot(g.n, g.wall_at_chi_weightk, "o-", label=f"p={p}")
+    ax[1].set_yscale("log"); ax[1].set_xlabel("n qubits"); ax[1].set_ylabel("wall time of 2048 shots at chi_weightk (s)")
+    ax[1].set_title("MPS sampling time (unbounded if chi_weightk>64)"); ax[1].legend()
+    fig.tight_layout(); fig.savefig(os.path.join(out, "mps_sweep.png"), dpi=130)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ns", type=int, nargs="+", default=[12, 16, 20, 24, 28])
     ap.add_argument("--ps", type=int, nargs="+", default=[0, 1, 2, 3])
     ap.add_argument("--append", action="store_true", help="merge with existing mps_sweep.csv")
+    ap.add_argument("--plot-only", action="store_true", help="regenerate mps_sweep.png from existing CSVs; no sweep")
     ap.add_argument("--exact-max-n", type=int, default=20)
     ap.add_argument("--budget", type=float, default=270.0, help="total seconds")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "..", "results"))
     a = ap.parse_args()
+    if a.plot_only:
+        df = pd.read_csv(os.path.join(a.out, "mps_sweep.csv"))
+        nd = pd.read_csv(os.path.join(a.out, "mps_chi_weightk.csv"))
+        make_plot(df, nd, a.out, sorted(df.p.unique()))
+        return
     t_start = time.time()
     rows = []
     for n in a.ns:
@@ -137,27 +161,13 @@ def main():
         unb = g[g.chi == 0].iloc[0]
         need.append(dict(n=n, p=p, true_maxbond=int(g.true_maxbond.iloc[0]), chi_weightk=chi_need if chi_need else ">64",
                          wall_unbounded=unb.wall_s,
-                         wall_at_need=float(ok.iloc[0].wall_s) if len(ok) else float(unb.wall_s)))
+                         wall_at_chi_weightk=float(ok.iloc[0].wall_s) if len(ok) else float(unb.wall_s)))
     nd = pd.DataFrame(need)
     print(nd.to_string(index=False))
     print(df[["n", "p", "chi_label", "wall_s", "wk_rate", "tv", "tv_refref", "e_err"]].round(4).to_string(index=False))
     nd.to_csv(os.path.join(a.out, "mps_chi_weightk.csv"), index=False)
 
-    import matplotlib; matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(1, 2, figsize=(11, 4))
-    for n in sorted(df.n.unique()):
-        g = df[(df.n == n) & (df.p == max(a.ps))].sort_values("chi")
-        g = g[g.chi > 0]
-        ax[0].plot(g.chi, g.wk_rate, "o-", label=f"n={n}")
-    ax[0].set_xscale("log", base=2); ax[0].set_xlabel("max bond dim chi"); ax[0].set_ylabel("weight-k rate")
-    ax[0].set_title(f"Hamming-weight preservation (p={max(a.ps)})"); ax[0].legend()
-    for p in sorted(nd.p.unique()):
-        g = nd[nd.p == p]
-        ax[1].plot(g.n, g.wall_at_need, "o-", label=f"p={p}")
-    ax[1].set_yscale("log"); ax[1].set_xlabel("n qubits"); ax[1].set_ylabel("wall time of 2048 shots at chi_weightk (s)")
-    ax[1].set_title("MPS sampling time (unbounded if chi_weightk>64)"); ax[1].legend()
-    fig.tight_layout(); fig.savefig(os.path.join(a.out, "mps_sweep.png"), dpi=130)
+    make_plot(df, nd, a.out, a.ps)
     print(f"total {time.time()-t_start:.0f}s")
 
 

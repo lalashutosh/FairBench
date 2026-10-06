@@ -1,0 +1,67 @@
+{
+ "frozen": {
+  "t": 1.799315289569933,
+  "alpha": 1.0,
+  "topology": "complete",
+  "best_m": 10
+ },
+ "tuned_on": "island_family(12)",
+ "tune_gap": 0.04386798351032317,
+ "pen_normalisation": "penalty diagonal / std over weight-k subspace",
+ "h": null,
+ "mixing_time_tv": {
+  "f12": {
+   "qemcmc": 31.0,
+   "multi": 23.0,
+   "indep": 23.0,
+   "swap": Infinity
+  },
+  "f14": {
+   "qemcmc": 88.0,
+   "multi": 41.0,
+   "indep": 41.0,
+   "swap": Infinity
+  },
+  "f16": {
+   "qemcmc": 320.0,
+   "multi": 103.0,
+   "indep": 108.0,
+   "swap": Infinity
+  },
+  "p0": {
+   "qemcmc": 13.0,
+   "multi": 5.0,
+   "indep": 5.0,
+   "swap": 11.0
+  }
+ },
+ "grid": {
+  "t": [
+   0.1,
+   0.16187677556400662,
+   0.26204090466999763,
+   0.42418336713854454,
+   0.6866543572027081,
+   1.1115339327095,
+   1.799315289569933,
+   2.9126735729859763,
+   4.714942062654641,
+   7.632396180736398,
+   12.355076835646473,
+   20.0
+  ],
+  "alpha": [
+   0,
+   0.25,
+   0.5,
+   1,
+   2,
+   4,
+   8
+  ],
+  "topology": [
+   "ring",
+   "complete"
+  ]
+ }
+}

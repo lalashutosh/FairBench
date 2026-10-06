@@ -34,27 +34,32 @@ def product_circuit(n: int, k: int) -> QuantumCircuit:
     return qc
 
 
-def evaluate(name, X, cost, unit, cs, u, F, seed, instance):
+def evaluate(name, X, cost, unit, cs, u, F, seed, instance, repair=True):
     M = len(F)
     acc = float(cs.check_batch(X, u).mean())
     pf = postprocess(X, cs, u, mode="filter", seed=seed)
     S = pf["samples"]
     nf = len(S)
-    pr = postprocess(X, cs, u, mode="repair", seed=seed)
-    Sr = pr["samples"]
-    return dict(
+    if repair:
+        pr = postprocess(X, cs, u, mode="repair", seed=seed)
+        Sr = pr["samples"]
+    out = dict(
         instance=instance, sampler=name, n_raw=len(X), acceptance=acc, n_feasible=nf,
         TV_to_unif=tv_to_uniform(S, F) if nf else float("nan"),
         TV_floor=tv_expected_uniform(M, nf, seed=seed) if nf else float("nan"),
         coverage=coverage(S, F) if nf else 0.0,
-        cost_per_feasible=cost_per_feasible_sample(cost, nf), cost_unit=unit,
+        cost_per_feasible=cost_per_feasible_sample(cost, nf), cost_unit=unit)
+    if not repair:
+        return out  # repair columns omitted (--no-repair)
+    out.update(
         n_repaired=pr["n_repaired"], n_feasible_repair=len(Sr),
         TV_after_repair=tv_to_uniform(Sr, F) if len(Sr) else float("nan"),
         TV_floor_repair=tv_expected_uniform(M, len(Sr), seed=seed) if len(Sr) else float("nan"),
         coverage_repair=coverage(Sr, F) if len(Sr) else 0.0)
+    return out
 
 
-def run_instance(label, u, cs, shots, n_seeds, maxiter, n_starts, lam):
+def run_instance(label, u, cs, shots, n_seeds, maxiter, n_starts, lam, repair=True):
     n, k = u.n, cs.cardinality
     F = enumerate_feasible(u, cs)
     M = len(F)
@@ -89,18 +94,18 @@ def run_instance(label, u, cs, shots, n_seeds, maxiter, n_starts, lam):
         rng = np.random.default_rng(sd)
         r = []
         X = rng.integers(0, 2, size=(shots, n), dtype=np.uint8)
-        r.append(evaluate("random_bitstrings", X, shots, "shots", cs, u, F, sd, label))
+        r.append(evaluate("random_bitstrings", X, shots, "shots", cs, u, F, sd, label, repair))
         X = sample(product_circuit(n, k), None, shots, "aer_statevector", seed=sd)
-        r.append(evaluate("product_state", X, shots, "shots", cs, u, F, sd, label))
+        r.append(evaluate("product_state", X, shots, "shots", cs, u, F, sd, label, repair))
         X = sample(build_ansatz(n, k, 0, None), None, shots, "aer_statevector", seed=sd)
-        r.append(evaluate("dicke_p0", X, shots, "shots", cs, u, F, sd, label))
+        r.append(evaluate("dicke_p0", X, shots, "shots", cs, u, F, sd, label, repair))
         X = sample(ans, res.params, shots, "aer_statevector", seed=sd)
-        r.append(evaluate("trained", X, shots, "shots", cs, u, F, sd, label))
+        r.append(evaluate("trained", X, shots, "shots", cs, u, F, sd, label, repair))
         rj = rejection_sample(u, cs, shots, seed=sd)
-        r.append(evaluate("rejection", rj.raw, rj.cost, rj.cost_unit, cs, u, F, sd, label))
+        r.append(evaluate("rejection", rj.raw, rj.cost, rj.cost_unit, cs, u, F, sd, label, repair))
         # mcmc: same number of feasible samples as rejection yields (thin=5, burn_in=200)
         mc = mcmc_swap_sample(u, cs, max(len(rj.samples), 1), burn_in=200, thin=5, seed=sd, x0=F[0])
-        r.append(evaluate("mcmc_swap", mc.samples, mc.cost, mc.cost_unit, cs, u, F, sd, label))
+        r.append(evaluate("mcmc_swap", mc.samples, mc.cost, mc.cost_unit, cs, u, F, sd, label, repair))
         for rr in r:
             rr["sample_seed"] = sd
             rr.update(exact.get(rr["sampler"], {}))
@@ -156,6 +161,7 @@ def main():
     ap.add_argument("--maxiter", type=int, default=200)
     ap.add_argument("--maxiter-island", type=int, default=None)
     ap.add_argument("--n-starts", type=int, default=2)
+    ap.add_argument("--no-repair", action="store_true", help="skip repair-mode computation; repair columns omitted from CSVs (filter numbers unchanged)")
     ap.add_argument("--lam", type=float, default=0.5)
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "..", "results"))
     a = ap.parse_args()
@@ -163,7 +169,7 @@ def main():
     rows, trows = [], []
     for label, (u, cs), mi in (("p0", p0_instance(), a.maxiter),
                                ("island", island_instance(), a.maxiter_island or a.maxiter)):
-        r, t, info = run_instance(label, u, cs, a.shots, a.n_seeds, mi, a.n_starts, a.lam)
+        r, t, info = run_instance(label, u, cs, a.shots, a.n_seeds, mi, a.n_starts, a.lam, not a.no_repair)
         rows += r; trows += t
     df, agg = aggregate(pd.DataFrame(rows))
     tdf = pd.DataFrame(trows)
@@ -185,8 +191,9 @@ def main():
                         for r in [pd.Series(r._asdict())]])
     print(f"\n=== Filter mode (primary): mean+-sd over {a.n_seeds} sampling seeds, shots={a.shots} ===")
     print(tab.to_string(index=False, float_format=lambda x: f"{x:.4g}"))
-    print("\n=== Repair mode (secondary; mean over seeds) ===")
-    print(df.groupby(["instance", "sampler"], sort=False)[
+    if not a.no_repair:
+      print("\n=== Repair mode (secondary; mean over seeds) ===")
+      print(df.groupby(["instance", "sampler"], sort=False)[
         ["n_repaired", "n_feasible_repair", "TV_after_repair", "TV_floor_repair", "coverage_repair"]
     ].mean().to_string(float_format=lambda x: f"{x:.4g}"))
     print("\n=== Training cost (separate; trained sampler only; trained once, seed 0) ===")
