@@ -84,3 +84,24 @@ def test_island_family_legacy_kept():
     u, cs = island_family_legacy(16, 5, 0)
     u0, cs0 = island_instance()
     assert np.array_equal(u.esg_score, u0.esg_score)
+
+
+def test_scaled_family_deterministic():
+    from fairbench.instances import scaled_family
+    u1, c1 = scaled_family(30, seed=2, n_mc=20_000)
+    u2, c2 = scaled_family(30, seed=2, n_mc=20_000)
+    assert np.array_equal(u1.esg_score, u2.esg_score) and np.array_equal(u1.carbon, u2.carbon)
+    assert [vars(c) for c in c1.constraints] == [vars(c) for c in c2.constraints]
+    assert c1.cardinality == 5
+
+
+def test_scaled_family_mc_matches_exact_n16():
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).parents[1] / "scripts"))
+    from aa_pf_scaling import estimate, wilson
+    from fairbench.instances import scaled_family
+    u, cs = scaled_family(16, seed=0, n_mc=50_000)
+    exact = len(enumerate_feasible(u, cs)) / 4368
+    e = estimate(u, cs, N_max=400_000, chunk=100_000, target_hits=10**9)
+    lo, hi = wilson(e["hits"], e["N"], z=3.0)  # 99.7% (fixed seed; 95% is a coin-flip-prone test)
+    assert lo <= exact <= hi

@@ -242,3 +242,47 @@ def island_family(n: int, k: int | None = None, seed: int = 0) -> tuple[Universe
         raise ValueError(f"need n > k; got n={n}, k={p['k']}")
     return _build_family(n, p["k"], seed, p["n_sectors"], p["cap"], p["esg_levels"],
                          p["carbon_levels"], p["sigma"], p["gamma"], p["esg_q"], p["carbon_q"])
+
+
+def scaled_family(n: int, k: int | None = None, seed: int = 0, esg_q: float = 0.5,
+                  carbon_q: float = 0.5, sigma: float = 10.0, gamma: float = 6.0,
+                  n_sectors: int | None = None, cap: int | None = None,
+                  n_mc: int = 200_000) -> tuple[Universe, ConstraintSet]:
+    """Realistically scaled constraint family for n ~ 16..200 (no enumeration; used for
+    feasible-fraction P_F studies). Same rule types as ``island_family`` (Cardinality,
+    SectorCap per sector, MinESG, CarbonCap) and the same sector-correlated ESG/carbon
+    model (esg = E[s] + sigma*z, carbon = C[s] + gamma*sigma*z + N(0, sigma)).
+    Scaling rules (overridable):
+      n_sectors = max(3, n // 10)            (~10 names per sector)
+      k         = max(5, n // 10)            (a 10%-of-universe fund)
+      cap       = ceil(k / n_sectors) + 1    (so caps bind: a fair share plus one)
+    Sector levels E[s] ~ U(30, 80), C[s] ~ U(80, 300) are drawn from the seed.
+    Thresholds: MinESG at quantile ``esg_q`` and CarbonCap at quantile ``carbon_q`` of the
+    averages over sector-cap-feasible uniform random k-subsets, estimated by Monte Carlo
+    (``n_mc`` draws, fixed RNG seed ``seed + 1000``; deterministic per (n, k, seed, ...)).
+    Not equal to ``island_family`` at n=16."""
+    ns = max(3, n // 10) if n_sectors is None else int(n_sectors)
+    k = max(5, n // 10) if k is None else int(k)
+    if n <= k:
+        raise ValueError(f"need n > k; got n={n}, k={k}")
+    cap = math.ceil(k / ns) + 1 if cap is None else int(cap)
+    r = np.random.default_rng(seed + 7)
+    E = r.uniform(30, 80, ns)
+    C = r.uniform(80, 300, ns)
+    u = synthetic_universe(n=n, n_sectors=ns, seed=seed)
+    si = np.array([int(s[1:]) for s in u.sector])
+    z = r.normal(0.0, 1.0, n)
+    u.esg_score = np.clip(E[si] + sigma * z, 0, 100)
+    u.carbon = np.clip(C[si] + gamma * sigma * z + r.normal(0.0, sigma, n), 10, 500)
+    rm = np.random.default_rng(seed + 1000)
+    idx = np.argpartition(rm.random((n_mc, n)), k - 1, axis=1)[:, :k]
+    cnt = np.zeros((n_mc, ns), np.int64)
+    np.add.at(cnt, (np.repeat(np.arange(n_mc), k), si[idx].ravel()), 1)
+    ok = (cnt <= cap).all(1)
+    if ok.sum() < 100:
+        raise ValueError("sector caps too tight: <100 cap-feasible MC subsets")
+    ib = idx[ok]
+    m = float(np.quantile(u.esg_score[ib].mean(1), esg_q)) - 1e-9
+    cc = float(np.quantile(u.carbon[ib].mean(1), carbon_q)) + 1e-9
+    cons = [Cardinality(k)] + [SectorCap(f"S{i}", cap) for i in range(ns)] + [MinESG(m), CarbonCap(cc)]
+    return u, ConstraintSet(cons)
