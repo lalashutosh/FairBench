@@ -1,0 +1,119 @@
+{
+  "synthetic": true,
+  "description": "QA-6 real-tool mandate instance (demo_mandate defaults), MC amplitudes",
+  "n": 150,
+  "k": 20,
+  "allowed_assets": 92,
+  "excluded_assets": 58,
+  "n_rules": 18,
+  "n_unmapped": 3,
+  "s_fund_buy_hold": 0.21989929486366444,
+  "planted_rank": 0.7,
+  "planted_premium": 0.08,
+  "mc_draws": 2000000,
+  "mc_batch": 50000,
+  "hits_F": 11083,
+  "hits_G": 7992,
+  "a_F": {
+    "estimate": 0.0055415,
+    "ci": [
+      0.005439561413869831,
+      0.0056453380942551945
+    ]
+  },
+  "a_G": {
+    "estimate": 0.003996,
+    "ci": [
+      0.003909512809391987,
+      0.004084392635914434
+    ]
+  },
+  "p": {
+    "estimate": 0.7211043941171164,
+    "ci": [
+      0.7004109041178141,
+      0.7417978841164186
+    ]
+  },
+  "table": [
+    {
+      "eps": 0.05,
+      "classical_proposals": 55767.941002192056,
+      "quantum_queries_median": 40550.0,
+      "quantum_queries_mean": 38216.666666666664,
+      "frac_within_eps": 1.0,
+      "ratio_classical_over_quantum": 1.375288310781555,
+      "eps_F_amp": 0.00026415178555986793,
+      "eps_G_amp": 0.00020121515649772578,
+      "iqae_angle_tol_F": 0.0017791663423464108,
+      "iqae_angle_tol_G": 0.0015947309173046662,
+      "reps": 30
+    },
+    {
+      "eps": 0.02,
+      "classical_proposals": 348549.63126370043,
+      "quantum_queries_median": 44700.0,
+      "quantum_queries_mean": 45363.333333333336,
+      "frac_within_eps": 1.0,
+      "ratio_classical_over_quantum": 7.797530900753925,
+      "eps_F_amp": 0.00010566071422394716,
+      "eps_G_amp": 8.048606259909031e-05,
+      "iqae_angle_tol_F": 0.0007116665369385643,
+      "iqae_angle_tol_G": 0.0006378923669218665,
+      "reps": 30
+    },
+    {
+      "eps": 0.01,
+      "classical_proposals": 1394198.5250548017,
+      "quantum_queries_median": 198900.0,
+      "quantum_queries_mean": 190400.0,
+      "frac_within_eps": 1.0,
+      "ratio_classical_over_quantum": 7.009545123453,
+      "eps_F_amp": 5.283035711197358e-05,
+      "eps_G_amp": 4.024303129954516e-05,
+      "iqae_angle_tol_F": 0.00035583326846928213,
+      "iqae_angle_tol_G": 0.00031894618346093326,
+      "reps": 30
+    },
+    {
+      "eps": 0.005,
+      "classical_proposals": 5576794.100219207,
+      "quantum_queries_median": 204800.0,
+      "quantum_queries_mean": 205170.0,
+      "frac_within_eps": 0.9666666666666667,
+      "ratio_classical_over_quantum": 27.230439942476597,
+      "eps_F_amp": 2.641517855598679e-05,
+      "eps_G_amp": 2.012151564977258e-05,
+      "iqae_angle_tol_F": 0.00017791663423464107,
+      "iqae_angle_tol_G": 0.00015947309173046663,
+      "reps": 30
+    },
+    {
+      "eps": 0.002,
+      "classical_proposals": 34854963.12637004,
+      "quantum_queries_median": 975850.0,
+      "quantum_queries_mean": 979986.6666666666,
+      "frac_within_eps": 1.0,
+      "ratio_classical_over_quantum": 35.717541759870926,
+      "eps_F_amp": 1.0566071422394717e-05,
+      "eps_G_amp": 8.048606259909032e-06,
+      "iqae_angle_tol_F": 7.116665369385643e-05,
+      "iqae_angle_tol_G": 6.378923669218665e-05,
+      "reps": 30
+    },
+    {
+      "eps": 0.001,
+      "classical_proposals": 139419852.50548017,
+      "quantum_queries_median": 970350.0,
+      "quantum_queries_mean": 1008770.0,
+      "frac_within_eps": 0.9666666666666667,
+      "ratio_classical_over_quantum": 143.67996342091016,
+      "eps_F_amp": 5.283035711197358e-06,
+      "eps_G_amp": 4.024303129954516e-06,
+      "iqae_angle_tol_F": 3.558332684692821e-05,
+      "iqae_angle_tol_G": 3.1894618346093326e-05,
+      "reps": 30
+    }
+  ],
+  "notes": "Classical proposals = 1.96^2 p(1-p)/(eps^2 a_F). Quantum = median total IQAE oracle queries of two IQAE runs (F, G) at amplitudes a_F, a_G on IdealOracle, combined with ratio_estimate; allocation as scripts/qae_breakeven.py alloc; angle tolerance eps_a/(2 sqrt(a(1-a))) capped at 0.49."
+}
