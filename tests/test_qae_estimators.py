@@ -153,3 +153,68 @@ def test_ratio_estimate_subspace():
     assert abs(r.estimate - true) < 0.01
     assert r.oracle_queries == rn.oracle_queries + rd.oracle_queries
     assert r.state_preps == rn.state_preps + rd.state_preps
+
+
+# ------------------------------------------------------------------ QA-F2 additions
+def test_mlae_lr_default_coverage_small_amplitude():
+    """Default LR CI: coverage >= 0.90 (nominal 0.95) incl. a=0.0055 where Fisher fails."""
+    rng = np.random.default_rng(2024)
+    reps = 250
+    for a in (0.0055, 0.05, 0.3):
+        o = IdealOracle(a)
+        hit = 0
+        for _ in range(reps):
+            r = mlae(o, exp_schedule(10), 30, rng)
+            assert r.extra["ci_method"] == "lr"
+            z = 1.959963984540054
+            assert r.extra["std"] == pytest.approx((r.ci[1] - r.ci[0]) / (2 * z))
+            hit += r.ci[0] <= a <= r.ci[1]
+        assert hit / reps >= 0.90, (a, hit / reps)
+    r = mlae(IdealOracle(0.1), exp_schedule(6), 30, rng, ci="fisher")
+    assert r.extra["ci_method"] == "fisher"
+
+
+class _FirstCallZero:
+    """Ideal oracle whose very first sample_hits returns 0 hits (a 1-in-1000 CI miss),
+    forcing a later CI that is disjoint from the carried one."""
+    def __init__(self, a):
+        self._o = IdealOracle(a)
+        self.a_true = a
+        self.n = 0
+
+    def sample_hits(self, m, shots, rng):
+        self.n += 1
+        return 0 if self.n == 1 else self._o.sample_hits(m, shots, rng)
+
+
+def test_iqae_disjoint_interval_does_not_collapse():
+    rng = np.random.default_rng(3)
+    a = 0.07
+    r = iqae(_FirstCallZero(a), 0.02, 0.05, rng, n_shots=100, max_rounds=500)
+    assert r.extra["rounds"] < 500, "must not loop forever on an inconsistent interval"
+    assert r.ci[1] - r.ci[0] > 0, "zero-width collapse"
+    assert r.ci[1] - r.ci[0] <= 2 * 0.02 * 1.01 or r.extra["rounds"] > 0
+    assert abs(r.estimate - a) < 0.05
+    assert r.extra["restarts"] >= 1
+
+
+def test_iqae_amplitude_tol_accounting_and_coverage():
+    from fairbench.qae.estimators import iqae_amplitude_tol
+    rng = np.random.default_rng(11)
+    for a, eps_a in ((0.005, 0.002), (0.07, 0.01), (0.4, 0.01)):
+        o = IdealOracle(a)
+        reps, ok = 150, 0
+        for _ in range(reps):
+            r = iqae_amplitude_tol(o, eps_a, 0.05, rng, n_shots=100)
+            ok += abs(r.estimate - a) <= eps_a
+        assert ok / reps >= 0.93, (a, ok / reps)
+        pq = r.extra["pilot_queries"]
+        assert pq > 0 and pq < r.oracle_queries
+        main_q = sum(m * n for m, n, _ in r.schedule)
+        # result schedule is main run only; totals include pilot
+        assert r.oracle_queries == main_q + pq
+        assert r.shots == sum(n for _, n, _ in r.schedule) + r.extra["pilot_shots"]
+        assert r.state_preps == (sum((2 * m + 1) * n for m, n, _ in r.schedule)
+                                 + r.extra["pilot_state_preps"])
+    r0 = iqae_amplitude_tol(IdealOracle(0.1), 0.01, 0.05, rng, pilot=False)
+    assert r0.extra["pilot_queries"] == 0

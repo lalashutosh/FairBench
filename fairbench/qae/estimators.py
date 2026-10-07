@@ -47,7 +47,7 @@ from scipy import optimize, stats
 
 __all__ = [
     "AEResult", "IdealOracle", "NoisyOracle", "SubspaceOracle",
-    "classical_mc", "canonical_ae", "iqae", "mlae", "ratio_estimate",
+    "classical_mc", "canonical_ae", "iqae", "iqae_amplitude_tol", "mlae", "ratio_estimate",
     "exp_schedule", "linear_schedule", "power_schedule",
 ]
 
@@ -250,7 +250,8 @@ def _find_next_k(k: int, up: bool, th_l: float, th_u: float, min_ratio: float = 
 
 
 def iqae(oracle, eps: float, alpha: float, rng: np.random.Generator, n_shots: int = 100,
-         ci_method: str = "beta", min_ratio: float = 2.0, max_rounds: int = 100_000) -> AEResult:
+         ci_method: str = "beta", min_ratio: float = 2.0, max_rounds: int = 100_000,
+         max_disjoint: int = 3) -> AEResult:
     """Iterative AE (Grinko, Gacon, Zoufal, Woerner, npj QI 2021, Algorithm 1).
 
     Maintains a confidence interval [theta_l, theta_u] (angle units 2 pi); each round picks
@@ -276,6 +277,7 @@ def iqae(oracle, eps: float, alpha: float, rng: np.random.Generator, n_shots: in
     sched = []                                  # per round (k, N, hits)
     rk_hits = rk_shots = 0                      # accumulated for consecutive equal k
     it = 0
+    n_bad = n_restarts = 0
     while th_u - th_l > eps / math.pi:
         it += 1
         if it > max_rounds:
@@ -307,17 +309,70 @@ def iqae(oracle, eps: float, alpha: float, rng: np.random.Generator, n_shots: in
             t_max = 1 - math.acos(1 - 2 * a_min) / (2 * math.pi)
         new_u = (math.floor(K * th_u) + t_max) / K
         new_l = (math.floor(K * th_l) + t_min) / K
-        # numerical safety: never widen, keep ordering
-        th_l, th_u = max(th_l, new_l), min(th_u, new_u)
-        if th_l > th_u:
-            th_l = th_u = 0.5 * (th_l + th_u)
+        # never widen; if the new CI is disjoint from the current one (a miss of one of the
+        # two intervals, prob <= alpha) do NOT intersect (that collapses to zero width and
+        # stops with a confident wrong answer): keep the previous interval and continue.
+        c_l, c_u = max(th_l, new_l), min(th_u, new_u)
+        if c_l <= c_u:
+            th_l, th_u = c_l, c_u
+            n_bad = 0
+        else:
+            n_bad += 1
+            if n_bad > max_disjoint:
+                # the carried interval is persistently inconsistent with fresh data (it must
+                # have missed the truth): discard it and restart from the full range
+                # (all queries so far stay charged).
+                th_l, th_u, k, up = 0.0, 0.25, 0, True
+                rk_hits = rk_shots = 0
+                n_bad = 0
+                n_restarts += 1
     a_l = math.sin(2 * math.pi * th_l) ** 2
     a_u = math.sin(2 * math.pi * th_u) ** 2
     est = 0.5 * (a_l + a_u)
     q, sp, s = _cost(sched)
     return AEResult(est, (a_l, a_u), q, sp, s, f"iqae_{ci_method}", sched,
-                    dict(std=(a_u - a_l) / (2 * _z(1 - alpha)), rounds=len(sched), T=T,
+                    dict(std=(a_u - a_l) / (2 * _z(1 - alpha)), rounds=len(sched), T=T, restarts=n_restarts,
                          theta=math.pi * (th_l + th_u), conf=1 - alpha))
+
+
+def iqae_amplitude_tol(oracle, eps_a: float, alpha: float, rng: np.random.Generator,
+                       n_shots: int = 100, pilot: bool = True, pilot_eps: float = 0.05,
+                       pilot_shots: int = 100, a_floor: float | None = None, **kw) -> AEResult:
+    """IQAE targeting an ABSOLUTE amplitude half-width ``eps_a`` (never reads ``a_true``).
+
+    Pilot (charged): coarse IQAE (theta half-width ``pilot_eps`` rad, level alpha/2) gives
+    a_hat and a CI. Since da = sin(2 theta) dtheta = 2 sqrt(a(1-a)) dtheta, the main run uses
+    eps_theta = eps_a / (2 sqrt(a_g (1 - a_g))), where a_g is the point of the pilot CI
+    closest to 1/2 (so the choice is conservative w.r.t. pilot error), guarded to
+    [a_floor, 1 - a_floor] (default a_floor = eps_a / 2). Main run: IQAE at level alpha/2
+    (union bound => overall coverage >= 1 - alpha). All pilot queries / state preps / shots
+    are added to the returned result and recorded in ``extra['pilot_queries']`` (plus
+    ``pilot_state_preps``, ``pilot_shots``, ``pilot_a_hat``, ``eps_theta``).
+    ``pilot=False``: a_g = 1/2 (worst case, eps_theta = eps_a/1), nothing charged, full alpha."""
+    if eps_a <= 0:
+        raise ValueError("eps_a must be > 0")
+    pq = ps = psh = 0
+    a_hat = None
+    if pilot:
+        pr = iqae(oracle, pilot_eps, alpha / 2, rng, n_shots=pilot_shots, **kw)
+        pq, ps, psh = pr.oracle_queries, pr.state_preps, pr.shots
+        a_hat = pr.estimate
+        lo, hi = pr.ci
+        a_g = 0.5 if lo <= 0.5 <= hi else (lo if lo > 0.5 else hi)
+        alpha_main = alpha / 2
+    else:
+        a_g, alpha_main = 0.5, alpha
+    floor = eps_a / 2 if a_floor is None else a_floor
+    a_g = min(max(a_g, floor), 1 - floor)
+    eps_th = min(0.45, eps_a / (2 * math.sqrt(a_g * (1 - a_g))))
+    r = iqae(oracle, eps_th, alpha_main, rng, n_shots=n_shots, **kw)
+    r.oracle_queries += pq
+    r.state_preps += ps
+    r.shots += psh
+    r.extra.update(pilot_queries=pq, pilot_state_preps=ps, pilot_shots=psh,
+                   pilot_a_hat=a_hat, eps_theta=eps_th, eps_a=eps_a, conf=1 - alpha)
+    r.method = r.method + "_atol"
+    return r
 
 
 # ============================================================================ MLAE
@@ -369,16 +424,15 @@ def _fisher(theta, ms, N, gamma, p_mixed):
 
 def mlae(oracle, schedule: Sequence[int], shots, rng: np.random.Generator,
          gamma: float | None = None, p_mixed: float | None = None, conf: float = 0.95,
-         ci: str = "fisher", grid_factor: int = 20, chunk: int = 200_000) -> AEResult:
+         ci: str = "lr", grid_factor: int = 20, chunk: int = 200_000) -> AEResult:
     """Maximum-likelihood AE (Suzuki et al. 2020). For each m in ``schedule`` take ``shots``
     (int or per-m sequence) shots after m iterates; MLE of theta in [0, pi/2] by a dense
     grid (spacing << period of the deepest term, grid_factor points per 1/(2m_max+1)) then
     bounded scalar refinement around the best grid point (avoids local optima).
 
     ``gamma`` given: noise-aware likelihood P = f sin^2 + (1-f) p_mixed, f = exp(-gamma(2m+1))
-    (Tanaka et al. 2021); p_mixed defaults to 0.5. CI on a: ``ci="fisher"`` (theta_hat +-
-    z/sqrt(I(theta_hat)) mapped through sin^2, clipped to [0, pi/2]) or ``ci="lr"``
-    (likelihood-ratio interval, 2 dlogL <= chi2_1(conf))."""
+    (Tanaka et al. 2021); p_mixed defaults to 0.5. CI on a: ``ci="lr"`` (default) is the likelihood-ratio interval (2 dlogL <= chi2_1(conf)) profiled on the dense grid; ``extra['std']`` = CI half-width / z. ``ci="fisher"`` (theta_hat +-
+    z/sqrt(I(theta_hat)) mapped through sin^2, clipped to [0, pi/2]; undercovers at small a)."""
     ms = np.asarray(list(schedule), int)
     if ms.ndim != 1 or ms.size == 0 or np.any(ms < 0):
         raise ValueError("schedule must be a non-empty list of m >= 0")
@@ -394,9 +448,11 @@ def mlae(oracle, schedule: Sequence[int], shots, rng: np.random.Generator,
     n_grid = max(2001, grid_factor * kmax + 1)
     grid = np.linspace(0.0, math.pi / 2, n_grid)
     best_ll, best_t = -np.inf, 0.0
+    ll_all = np.empty(n_grid)
     for i in range(0, n_grid, chunk):
         tg = grid[i:i + chunk]
         ll = _loglik(tg, ms, N, H, g, pm)
+        ll_all[i:i + chunk] = ll
         j = int(np.argmax(ll))
         if ll[j] > best_ll:
             best_ll, best_t = float(ll[j]), float(tg[j])
@@ -415,31 +471,28 @@ def mlae(oracle, schedule: Sequence[int], shots, rng: np.random.Generator,
     if ci == "fisher":
         t_lo, t_hi = max(0.0, th - z * sd_th), min(math.pi / 2, th + z * sd_th)
     elif ci == "lr":
+        # likelihood-ratio interval profiled over the dense grid: hull of ALL grid points
+        # with 2 (logL_hat - logL) <= chi2_1(conf) (the LR set is multimodal for deep
+        # schedules; a contiguous window around the MLE undercovers when the MLE sits on a
+        # wrong alias), edges extended by one grid step.
         thr = 0.5 * float(stats.chi2.ppf(conf, 1))
-        w = min(math.pi / 2, max(10 * z * sd_th, 4 * step))
-        loc = np.linspace(max(0.0, th - w), min(math.pi / 2, th + w), 4001)
-        ok = (ll_hat - _loglik(loc, ms, N, H, g, pm)) <= thr
-        # contiguous region around th
-        c = int(np.argmin(np.abs(loc - th)))
-        a_ = c
-        while a_ > 0 and ok[a_ - 1]:
-            a_ -= 1
-        b_ = c
-        while b_ < len(loc) - 1 and ok[b_ + 1]:
-            b_ += 1
-        t_lo, t_hi = float(loc[max(a_ - 1, 0)]), float(loc[min(b_ + 1, len(loc) - 1)])
-        if a_ == 0:
-            t_lo = float(loc[0])
-        if b_ == len(loc) - 1:
-            t_hi = float(loc[-1])
+        idx = np.flatnonzero((ll_hat - ll_all) <= thr)
+        if idx.size == 0:
+            idx = np.array([int(np.argmin(np.abs(grid - th)))])
+        t_lo = float(grid[max(int(idx[0]) - 1, 0)])
+        t_hi = float(grid[min(int(idx[-1]) + 1, n_grid - 1)])
+        t_lo, t_hi = min(t_lo, th), max(t_hi, th)
     else:
         raise ValueError(ci)
     sched = [(int(m), int(n), int(h)) for m, n, h in zip(ms, N, H)]
     q, sp, s = _cost(sched)
     name = "mlae" + ("_noise_aware" if gamma else "")
-    return AEResult(est, (math.sin(t_lo) ** 2, math.sin(t_hi) ** 2), q, sp, s, name, sched,
-                    dict(theta=th, theta_std=sd_th, fisher=I,
-                         std=abs(math.sin(2 * th)) * sd_th, loglik=ll_hat, conf=conf,
+    a_lo, a_hi = math.sin(t_lo) ** 2, math.sin(t_hi) ** 2
+    # std consistent with the reported CI (LR: half-width / z; Fisher: delta method)
+    std = (a_hi - a_lo) / (2 * z) if ci == "lr" else abs(math.sin(2 * th)) * sd_th
+    return AEResult(est, (a_lo, a_hi), q, sp, s, name, sched,
+                    dict(theta=th, theta_std=sd_th, fisher=I, ci_method=ci,
+                         std=std, loglik=ll_hat, conf=conf,
                          gamma=gamma, p_mixed=p_mixed if gamma else None))
 
 
