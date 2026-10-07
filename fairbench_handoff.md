@@ -1,133 +1,119 @@
-# FairBench — Claude Code handoff
+# FairBench — handoff
+
+_Last updated 2026-10-07. Repo: `git@github.com:lalashutosh/FairBench.git` (`main`). Detailed wave-by-wave log and numbers: [`BUILD_PLAN.md`](BUILD_PLAN.md)._
 
 ## Context
 
 Team #22 "FairBench" at the Hanken Quantum x Finance Hackathon (8–10 Oct 2026).
 
-**Problem (may pivot):** When an ESG fund underperforms, is it the manager or the ESG constraints? The approach is random-portfolio benchmarking: sample many portfolios that satisfy the *same* rules as the fund, build a null distribution of returns, and see where the real fund ranks. Classical constrained sampling degrades as rule sets grow (MCMC gets trapped in islands, rejection sampling acceptance collapses).
+**Problem (may pivot):** When an ESG fund underperforms, is it the manager or the ESG constraints? The approach is random-portfolio benchmarking: sample many portfolios that satisfy the *same* rules as the fund, build a null distribution of returns, and see where the real fund ranks. Classical constrained sampling can degrade as rule sets grow (MCMC gets trapped in islands; rejection-sampling acceptance falls).
 
-**Quantum contribution:** Constraint-preserving circuits (Dicke state + XY mixer) that only ever produce portfolios with exactly k holdings, plus penalty or trained layers for the other constraints. The fault-tolerant roadmap adds amplitude amplification, giving a quadratic speedup over rejection sampling.
+**Quantum contribution (as tested, see findings below):** Constraint-preserving circuits (Dicke state + XY mixer) that only produce portfolios with exactly k holdings, plus penalty or trained layers for the other constraints, plus a fault-tolerant amplitude-amplification (AA) roadmap. We benchmarked all three honestly against strong classical baselines; **none shows a speedup at the scales we could test**. The pitch must use the review-safe wording in this file, not "quadratic speedup".
 
-**Pivot plan:** If problem validation fails, the same engine becomes a CVaR-VQA ESG-constrained portfolio **optimizer**. Only the application layer changes. **Keep everything below the application layer problem-agnostic.**
+**Pivot plan:** If problem validation fails, the same engine becomes a CVaR-VQA ESG-constrained portfolio **optimizer**. Only the application layer changes. **Keep everything below `apps/` problem-agnostic.**
 
-## Architecture (build in this order)
+---
 
-| Priority | Layer | Modules |
-|---|---|---|
-| P0 | Data and constraints | `data.py`, `constraints.py` |
-| P0 | Quantum core | `quantum/dicke.py`, `quantum/ansatz.py`, `quantum/hamiltonian.py`, `backends.py` |
-| P1 | Training and post-processing | `training.py`, `postprocess.py` |
-| P1 | Benchmark harness | `baselines.py`, `metrics.py` |
-| P2 | Application (swap on pivot) | `apps/attribution.py`, `apps/optimizer.py` |
+## Where things stand
 
-## Repo layout
+| Area | Status |
+|---|---|
+| Data, constraints, quantum core, backends, baselines, metrics (P0) | Done, tested |
+| Training, post-processing, island instances, ablation, MPS sweep (P1) | Done, tested |
+| Quantum-enhanced MCMC study (Q) | Done — no quantum gain |
+| Amplitude-amplification fault-tolerant resource estimate (AA) | Done — no wall-clock advantage |
+| **Application layer: `apps/attribution.py`, `apps/optimizer.py` (P2)** | **Not started (2-line stubs)** |
+| End-to-end demo script for the pitch | Not started (`scripts/p0_demo.py` is the toy benchmark only) |
+| Pitch deck | Not started |
+| Hardware runs (`ibm` / `vtt` backends) | Stubs that raise `NotImplementedError` |
+
+Test suite: **238 tests, all green** (~30 s).
+
+### Key findings (use this wording in the pitch)
+
+1. **Dicke + filter ≡ classical rejection sampling** in distribution. It is a correctness baseline, not an advantage (P0 toy: acceptance 0.240 vs 0.244).
+2. **Trained layers (P1):** on the P0 toy, acceptance rises 0.24 → 0.32, but the distribution moves away from uniform (TV above sampling floor 0.05 vs 0.00). On the island instance the gain is negligible (0.0123 → 0.0138). Training costs ≥ ~400k shot-equivalents, so it needs ~400k feasible samples to pay back. Swap-MCMC is trapped on islands (coverage 0.31 vs 0.85 for rejection).
+3. **MPS simulability (P1):** bond dimension needed grows fast with depth (n=20, p=2: max bond 232, 44 s), so the circuit is not trivially classically simulable at depth, but this is not an advantage claim.
+4. **Quantum-enhanced MCMC (Q):** exact spectral gaps, n ≤ 16, parameters frozen on seeds 0–4 and reported on held-out seeds. QeMCMC beats penalty-blind chains 9–19× per step **only when given an exact feasibility oracle**, and a classical tilted walk given the same oracle does at least as well (ratio 0.42–0.84). Pitch line: *"We found no evidence of quantum advantage at n ≤ 16 (small instances, a trend not a proof)."*
+5. **Amplitude amplification (AA):** we built a verified reversible feasibility oracle (~120–130·n Toffoli) and a full logical cost model. Samples are exactly uniform over the feasible set. Algorithmic logical qubits ≈ 200–400 at n = 100–200 (excludes factories/routing). Quantum takes ~0.3–1 s per sample (optimistic hardware) vs ~30–120 µs classically, i.e. ~10⁴× slower. Break-even needs a feasible fraction below ~1e-9 to 1e-12, but our synthetic constraint family sits at 0.01–0.2. Full pitch-safe paragraph: `BUILD_PLAN.md` → "AA-3 results".
+
+**Honest story for the pitch:** a constraint-preserving quantum sampler plus a careful benchmarking harness. Every speedup route was tested against fair classical baselines, and we report where the break-even would be. The practical tool (attribution) runs on classical rejection sampling today, with the quantum sampler as a drop-in backend.
+
+---
+
+## Getting started
+
+```bash
+git clone git@github.com:lalashutosh/FairBench.git && cd FairBench
+uv venv --python 3.11 .venv
+uv pip install -e ".[dev]"
+OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q        # 238 passed
+.venv/bin/python scripts/p0_demo.py                     # toy benchmark table
+```
+
+### ⚠️ Memory safety (read before running scripts)
+The dev laptop has 14 GB RAM. A runaway script once got OOM-killed and took VS Code down with it. For heavy scripts:
+```bash
+ulimit -v 4000000; OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 timeout 1500 .venv/bin/python -u scripts/aa_estimate.py
+```
+Don't use `ulimit -v` with the full test suite: Qiskit Aer reserves virtual memory and fails with `bad_alloc`. Cap threads instead.
+
+---
+
+## Repo map
 
 ```
 fairbench/
-  pyproject.toml
-  fairbench/
-    __init__.py
-    data.py
-    constraints.py
-    backends.py
-    training.py
-    postprocess.py
-    baselines.py
-    metrics.py
-    quantum/
-      __init__.py
-      dicke.py
-      ansatz.py
-      hamiltonian.py
-    apps/
-      __init__.py
-      attribution.py      # P2 stub only for now
-      optimizer.py        # P2 stub only for now
-  scripts/
-    p0_demo.py
-  tests/
-    test_constraints.py
-    test_dicke.py
-    test_ansatz.py
-    test_baselines.py
+  data.py           Universe dataclass, CSV loader, synthetic_universe
+  constraints.py    Cardinality, SectorCap, Exclusion, MinESG, CarbonCap, ConstraintSet (ALL rule logic lives here)
+  instances.py      p0_instance, island_instance, island_family(n, seed), scaled_family(n, seed) (n up to 200)
+  backends.py       sample(circuit, params, shots, backend="aer_statevector"|"aer_mps"|"ibm"|"vtt")
+  baselines.py      enumerate_feasible, random_k_subsets, rejection_sample, mcmc_swap_sample
+  metrics.py        acceptance_rate, tv_to_uniform, coverage, cost_per_feasible_sample
+  objectives.py     training objectives as callables on samples (uniformity, CVaR, ...)
+  training.py       train(ansatz, objective_fn, backend, optimizer="COBYLA"|"SPSA", ...)
+  postprocess.py    filter_feasible, repair (flagged: biases sampling), assign_weights
+  chains.py         generic MH chains, pluggable proposals, exact transition matrix / spectral gap
+  quantum/
+    dicke.py        dicke_state(n, k)  (Bärtschi–Eidenbenz)
+    ansatz.py       xy_mixer, cost_layer, build_ansatz(n, k, p, cost_op, topology)
+    hamiltonian.py  penalty_operator, objective_operator (mean-variance QUBO for the optimizer pivot)
+    proposal.py     quantum-enhanced MCMC proposal in the weight-k subspace
+  ft/
+    oracle.py       reversible feasibility oracle + integer quantisation of ESG/carbon rules
+    revsim.py       fast classical simulator for reversible circuits
+    resources.py    logical FT cost model: Dicke + oracle + reflection, known/BBHT/fixed-point schedules
+  apps/
+    attribution.py  P2 — EMPTY STUB
+    optimizer.py    P2 — EMPTY STUB (pivot)
+scripts/
+  p0_demo.py        toy benchmark: Dicke vs rejection vs MCMC
+  p1_ablation.py    sampler ablation, identical post-processing (use --no-repair for speed)
+  p1_mps_sweep.py   MPS bond-dimension sweep
+  q_gap_sweep2.py   QeMCMC vs classical chains, exact spectral gaps (pre-registered protocol)
+  aa_pf_scaling.py  feasible-fraction scaling n = 16..200
+  aa_estimate.py    AA wall-clock vs classical, break-even plot
+results/            CSV/PNG/JSON outputs of all scripts (plots ready for slides: ablation.png,
+                    mps_sweep.png, q2_gap.png, aa_pf_scaling.png, aa_breakeven.png)
+BUILD_PLAN.md       full execution log, per-wave results, review findings, pitch-safe wording
 ```
 
-## Interfaces
+## Core conventions (don't break these)
+- A portfolio *selection* is a uint8 vector `x` of length n (`x[i] = 1` = asset i held). Every sampler returns an `(shots, n)` uint8 array, so all metrics work on any sampler. Weights come later via `postprocess.assign_weights`.
+- Qiskit bitstrings are little-endian; `backends.sample` converts them so that column i is asset i (tested).
+- Constraint logic lives only in `constraints.py`. Cardinality is enforced by the circuit and never penalised.
+- Every random function takes `seed`; tests fix seeds and make no network or hardware calls.
+- Python 3.11, type hints, NumPy-vectorised checks.
 
-Representation: a portfolio *selection* is a binary vector `x` of length n (`x[i] = 1` means asset i is held). Weights are assigned later in post-processing (equal-weight by default).
+---
 
-### data.py
-- `@dataclass Universe`: `tickers: list[str]`, `mu: np.ndarray (n,)`, `cov: np.ndarray (n,n)`, `sector: list[str]`, `esg_score: np.ndarray (n,)`, `carbon: np.ndarray (n,)`, `returns: pd.DataFrame | None` (historical, for attribution later).
-- `load_universe(csv_path) -> Universe`
-- `synthetic_universe(n, n_sectors, seed) -> Universe` for development and tests.
+## Next tasks (suggested order)
 
-### constraints.py
-- `Constraint` protocol: `check(x: np.ndarray, u: Universe) -> bool` and `check_batch(X: np.ndarray, u) -> np.ndarray[bool]` (vectorised over rows).
-- Implementations: `Cardinality(k)`, `SectorCap(sector, max_count)`, `Exclusion(indices)`, `MinESG(min_avg_score)`, `CarbonCap(max_avg)`.
-- `ConstraintSet(constraints)` with `check`, `check_batch`, and `cardinality` (returns k, used by the circuit).
-- Constraints are plain data plus functions. Never hard-code ESG logic elsewhere.
-
-### quantum/dicke.py
-- `dicke_state(n, k) -> QuantumCircuit`: deterministic Dicke state preparation (Bärtschi & Eidenbenz 2019, split-and-cyclic-shift construction), giving an equal superposition of all weight-k bitstrings.
-
-### quantum/ansatz.py
-- `xy_mixer(n, beta: Parameter, topology="ring"|"complete") -> QuantumCircuit`: exp(-iβ(XX+YY)/2) on edges. Must preserve Hamming weight.
-- `cost_layer(op: SparsePauliOp, gamma: Parameter) -> QuantumCircuit`
-- `build_ansatz(n, k, p, cost_op, topology) -> QuantumCircuit` = Dicke prep followed by p × (cost layer, mixer), with parameter vectors γ and β.
-
-### quantum/hamiltonian.py
-- `penalty_operator(cs: ConstraintSet, u: Universe, weights) -> SparsePauliOp`: encodes non-cardinality constraints as quadratic penalties (x_i = (1 - Z_i)/2). Cardinality is **not** penalised, because the circuit enforces it.
-- `objective_operator(u, risk_aversion) -> SparsePauliOp`: mean–variance QUBO, used by the optimizer pivot.
-
-### backends.py
-- `sample(circuit, params, shots, backend="aer_statevector"|"aer_mps"|"ibm"|"vtt", seed=None) -> np.ndarray[shots, n]` (uint8).
-- **Bit-order convention:** Qiskit bitstrings are little-endian. Convert so that column i is asset i. Write a test for this.
-- `ibm` and `vtt` are stubs for now and should raise `NotImplementedError` with a clear message. Credentials come from environment variables only.
-
-### baselines.py
-- `enumerate_feasible(u, cs) -> np.ndarray` (exact; iterate over k-combinations; only for n ≤ ~25).
-- `random_k_subsets(n, k, shots, seed)`: classical analogue of the Dicke state.
-- `rejection_sample(u, cs, shots, seed)`: random k-subsets filtered by the constraints.
-- `mcmc_swap_sample(u, cs, shots, burn_in, thin, seed)`: Metropolis chain whose move swaps one held asset for one non-held asset and is accepted only if the result is feasible. Records the number of moves for cost accounting.
-
-### metrics.py
-- `acceptance_rate(X, cs, u)`
-- `tv_to_uniform(X_feasible, feasible_set)`: total variation distance between the empirical distribution and uniform over the exact feasible set.
-- `coverage(X_feasible, feasible_set)`: fraction of feasible portfolios seen at least once.
-- `cost_per_feasible_sample(...)`: shots or chain moves per accepted feasible sample.
-
-### training.py (P1)
-- `train(ansatz, objective_fn, backend, optimizer="COBYLA"|"SPSA", maxiter, seed)`. The objective is a callable on sampled bitstrings, so CVaR (optimizer pivot) and a uniformity objective (benchmarking) are both just functions.
-
-### postprocess.py (P1)
-- `filter_feasible`, `repair` (greedy swap to feasibility, but **record that it was used**, because it biases sampling), `assign_weights(x, scheme="equal")`.
-
-## P0 milestone — `scripts/p0_demo.py`
-
-1. Synthetic universe: n = 12, k = 4, 3 sectors, SectorCap(max 2 per sector) and MinESG.
-2. Exact feasible set via enumeration.
-3. Sample with: (a) `build_ansatz` with p = 0 (pure Dicke) on Aer, then filtering; (b) `rejection_sample`; (c) `mcmc_swap_sample`.
-4. Print a table of acceptance rate, TV distance to uniform, coverage, and cost per feasible sample.
-
-## Tests (must pass before moving on)
-- Constraints agree with brute force on random vectors.
-- `dicke_state(6, 3)`: every sample has weight 3 and the distribution is uniform over all C(6,3) = 20 states (statevector check, exact).
-- `xy_mixer` preserves Hamming weight for random β (statevector check).
-- Bit-order round trip: preparing a known basis state returns the expected `x`.
-- No network or hardware calls in tests. Fix all seeds.
-
-## Important caveat (keep this honest in the pitch)
-Pure Dicke + filtering produces **exactly the same distribution** as classical random k-subsets + rejection. It is a correctness baseline, **not** a quantum advantage. The quantum value has to come from:
-- penalty or trained layers that push probability mass onto the feasible set *while staying close to uniform* (measure with TV distance, not just acceptance rate);
-- amplitude amplification (fault-tolerant roadmap; resource estimate only);
-- the ablation: same post-processing, swap only the sampler (random bitstrings, shallow/unentangled circuit, our circuit on a simulator, our circuit on hardware);
-- the MPS simulability check (`aer_mps` with a bond-dimension sweep) showing where classical simulation gets expensive.
-
-## Conventions
-- Python 3.11. Dependencies: `qiskit>=1.0`, `qiskit-aer`, `numpy`, `pandas`, `scipy`, `pytest`, `matplotlib`. Add `qiskit-ibm-runtime` and `qiskit-iqm` only when wiring hardware.
-- Type hints, small pure functions, NumPy-vectorised checks.
-- Every sampler returns an `(shots, n)` uint8 array, so all metrics work on any sampler.
-- Use a uniform seed argument everywhere for reproducibility.
-
-## First task for Claude Code
-Scaffold the repo above, implement all P0 modules and tests, then run `pytest` and `scripts/p0_demo.py`. Stub the P1 and P2 modules with docstrings and `NotImplementedError`. Report the demo table when done.
+1. **`apps/attribution.py` (highest priority).** Inputs: a `Universe` with historical `returns`, the fund's rule set as a `ConstraintSet`, and the fund's actual holdings and returns. Steps: draw N feasible portfolios (default `baselines.rejection_sample`; the sampler is a parameter so the Dicke/quantum backend drops in), weight them with `postprocess.assign_weights`, compute their returns over the window, and report the fund's percentile rank in that null distribution plus a plot. The **constraint-only effect** (null median vs unconstrained benchmark) vs the **manager effect** (fund vs null median) is the headline output. Keep it a thin layer over existing modules.
+   - Needs real or realistic fund data. `data.load_universe(csv_path)` exists. If no real data, generate returns synthetically and say so.
+2. **Demo script** `scripts/demo_attribution.py`: one command, prints the ranking and saves a plot to `results/`. Run with rejection sampling and with Dicke on `aer_statevector` (small n) to show the quantum sampler slots in.
+3. **Pitch deck** from the findings and wording above. Plots are already in `results/`.
+4. **Optional:**
+   - `apps/optimizer.py` (pivot: CVaR-VQA using `objective_operator` + `training.train` with a CVaR objective).
+   - A short hardware run via `ibm` or `vtt` in `backends.py`, framed as feasibility only. Credentials from environment variables only.
+   - Open nits: the MPS sweep plot label and the slow default ablation runtime (P1 notes in `BUILD_PLAN.md`).
