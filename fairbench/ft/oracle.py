@@ -393,8 +393,9 @@ class _Builder:
 
 
 def _acc_bits(T: int, smax: int) -> int:
-    """r with 2^r >= T and 2^r > smax - T (accumulator has r+1 bits)."""
-    r = 0
+    """r with 2^r >= T and 2^r > smax - T (accumulator has r+1 bits). r >= 1: a 1-bit
+    accumulator would need a 0-width temp register in ``add_const_ctrl`` (IndexError)."""
+    r = 1
     while (1 << r) < T or (1 << r) <= smax - T:
         r += 1
     return r

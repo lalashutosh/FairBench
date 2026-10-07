@@ -345,3 +345,30 @@ def test_approx_formula_for_new_rules():
     assert 0.95 * info.toffoli_count <= a["toffoli"] <= 1.05 * info.toffoli_count
     assert info.components["linear"]["toffoli"] > 0
     assert math.isclose(info.components["linear"]["toffoli"], info.components["esg"]["toffoli"], rel_tol=0.25)
+
+
+def test_one_bit_quantisation_builds_and_matches():
+    """Regression: bits=1 gave a 1-bit accumulator and no temp register -> IndexError."""
+    import itertools
+    from fairbench.constraints import Cardinality
+    from fairbench.ft import simulate
+    from fairbench.ft.oracle import _all_weight_k
+    from fairbench.ft.resources import oracle_formula_counts
+    for seed in range(3):
+        u = synthetic_universe(n=5, n_sectors=2, seed=seed)
+        g = np.random.default_rng(seed).normal(1.1, 0.2, 5)
+        for k in (2, 3):
+            sums = sorted(sum(c) for c in itertools.combinations(g, k))
+            for qq in (0.2, 0.5, 0.8):
+                for d in (">=", "<"):
+                    cs = ConstraintSet([Cardinality(k), LinearThreshold(g, sums[int(qq * (len(sums) - 1))], d)])
+                    q = quantise(u, cs, 1)
+                    qc, info = feasibility_oracle(u, cs, mode="bit", quant=q)
+                    X = _all_weight_k(5, k)
+                    inp = np.zeros((len(X), qc.num_qubits), np.uint8)
+                    inp[:, :5] = X
+                    out = simulate(qc, inp)
+                    assert not out[:, 6:].any()
+                    assert np.array_equal(out[:, 5].astype(bool), q.check_batch(X, u, cs))
+                    f = oracle_formula_counts(u, cs, quant=q, mode="bit")
+                    assert f["toffoli"] == info.toffoli_count
