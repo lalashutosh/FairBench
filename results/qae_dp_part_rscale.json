@@ -1,0 +1,170 @@
+[
+  {
+    "n": 50,
+    "k": 5,
+    "weighted_dims": 1,
+    "B": 8,
+    "status": "ok",
+    "peak_states": 162,
+    "runtime_s": 0.001478788999520475,
+    "shape": [
+      6,
+      27
+    ]
+  },
+  {
+    "n": 50,
+    "k": 5,
+    "weighted_dims": 1,
+    "B": 16,
+    "status": "ok",
+    "peak_states": 336,
+    "runtime_s": 0.0015449630000148318,
+    "shape": [
+      6,
+      56
+    ]
+  },
+  {
+    "n": 50,
+    "k": 5,
+    "weighted_dims": 2,
+    "B": 8,
+    "status": "ok",
+    "peak_states": 3402,
+    "runtime_s": 0.004657383000449045,
+    "shape": [
+      6,
+      21,
+      27
+    ]
+  },
+  {
+    "n": 50,
+    "k": 5,
+    "weighted_dims": 2,
+    "B": 16,
+    "status": "ok",
+    "peak_states": 14448,
+    "runtime_s": 0.007856125000216707,
+    "shape": [
+      6,
+      43,
+      56
+    ]
+  },
+  {
+    "n": 50,
+    "k": 5,
+    "weighted_dims": 3,
+    "B": 8,
+    "status": "ok",
+    "peak_states": 57834,
+    "runtime_s": 0.02188923799985787,
+    "shape": [
+      6,
+      21,
+      17,
+      27
+    ]
+  },
+  {
+    "n": 50,
+    "k": 5,
+    "weighted_dims": 3,
+    "B": 16,
+    "status": "ok",
+    "peak_states": 491232,
+    "runtime_s": 0.09041993299979367,
+    "shape": [
+      6,
+      43,
+      34,
+      56
+    ]
+  },
+  {
+    "n": 100,
+    "k": 10,
+    "weighted_dims": 1,
+    "B": 8,
+    "status": "ok",
+    "peak_states": 495,
+    "runtime_s": 0.002418656000372721,
+    "shape": [
+      11,
+      45
+    ]
+  },
+  {
+    "n": 100,
+    "k": 10,
+    "weighted_dims": 1,
+    "B": 16,
+    "status": "ok",
+    "peak_states": 1056,
+    "runtime_s": 0.003069559000323352,
+    "shape": [
+      11,
+      96
+    ]
+  },
+  {
+    "n": 100,
+    "k": 10,
+    "weighted_dims": 2,
+    "B": 8,
+    "status": "ok",
+    "peak_states": 23760,
+    "runtime_s": 0.01545797099970514,
+    "shape": [
+      11,
+      48,
+      45
+    ]
+  },
+  {
+    "n": 100,
+    "k": 10,
+    "weighted_dims": 2,
+    "B": 16,
+    "status": "ok",
+    "peak_states": 106656,
+    "runtime_s": 0.045236175000354706,
+    "shape": [
+      11,
+      101,
+      96
+    ]
+  },
+  {
+    "n": 100,
+    "k": 10,
+    "weighted_dims": 3,
+    "B": 8,
+    "status": "ok",
+    "peak_states": 974160,
+    "runtime_s": 0.5397172699995281,
+    "shape": [
+      11,
+      48,
+      41,
+      45
+    ]
+  },
+  {
+    "n": 100,
+    "k": 10,
+    "weighted_dims": 3,
+    "B": 16,
+    "status": "ok",
+    "peak_states": 9172416,
+    "runtime_s": 7.746082992000083,
+    "shape": [
+      11,
+      101,
+      86,
+      96
+    ]
+  }
+]

@@ -304,4 +304,8 @@ Pitch-safe wording:
 
 Must not say: "quantum speedup for attribution", "advantage grows as mandates tighten" without "vs rejection sampling / where MCMC is trapped", any ε* break-even number, "7×" as a point value. Must qualify: noiseless simulation, synthetic data, percentile is the statistic that benefits (medians little), full mandate oracle hypothetical, quantisation bias floor ~0.1–0.4 pp.
 
-Open: second review of the fixes not run; exact-counting DP baseline not implemented; quantum-walk (Szegedy/Montanaro) speedup of MCMC not explored; bits=1 oracle bug fixed (ee0538e).
+8. **Exact-counting DP (QA-7, `qae/exact_count.py`, results/qae_dp*):** sector DP over (count, CountBound counts, binned weighted sums). A guaranteed ±0.01 bracket needs B≈1000 bins → ~1e12 cells at n=100 with 3 weighted rules; reachable B (12–24) gives unguaranteed point estimates within 0.5 pp at n=100 in ~100 s (rejection: 0.16 s for ±0.01). With ≤2 weighted rules the DP is cheap and a real classical competitor. Encodable mandate (4 weighted rules + 10 overlapping country caps): ≥2.6e16 cells even at B=4 — intractable. Wording: *"exact counting is unguaranteed or intractable at realistic precision once three or more weighted rules combine, and fails on mandates with overlapping group caps, average bounds, min-groups or risk caps."*
+
+Demo: `scripts/demo_qae.py` (2 s) — loose vs tight instance, errors vs exact, multi-rep reference. Pitch figure: `results/qae_pitch_figure.png`.
+
+Open: second review of the fixes not run; quantum-walk (Szegedy/Montanaro) speedup of MCMC not explored; bits=1 oracle bug fixed (ee0538e).
