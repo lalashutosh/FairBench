@@ -1,0 +1,74 @@
+{
+  "synthetic": true,
+  "noiseless_simulation": true,
+  "n": 16,
+  "k": 5,
+  "seed": 0,
+  "years": 3.0,
+  "premium": 0.08,
+  "planted_rank": 0.7,
+  "results": {
+    "exact": {
+      "percentile": 61.33333333333333,
+      "null_median": 0.08081138999895798,
+      "benchmark_median": 0.2840417405182454,
+      "constraint_effect": -0.2032303505192874,
+      "manager_effect": 0.035490895321166116,
+      "queries": null
+    },
+    "classical": {
+      "percentile": 62.03999999999999,
+      "null_median": 0.08081138999896598,
+      "benchmark_median": 0.28432785089556467,
+      "constraint_effect": -0.2035164608965987,
+      "manager_effect": 0.03549089532115657,
+      "queries": 75000
+    },
+    "quantum": {
+      "percentile": 61.33128796300683,
+      "null_median": 0.0807758607506767,
+      "benchmark_median": 0.2841809446072643,
+      "constraint_effect": -0.20340508385658757,
+      "manager_effect": 0.03552642456944739,
+      "queries": 335800
+    },
+    "classical_matched": {
+      "percentile": 61.25764525993884,
+      "null_median": 0.08093342194081288,
+      "benchmark_median": 0.2824816383465687,
+      "constraint_effect": -0.20154821640575582,
+      "manager_effect": 0.03536886337931122,
+      "queries": 253000
+    }
+  },
+  "details": {
+    "method": "iqae",
+    "eps": 0.01,
+    "seed": 0,
+    "fund_return": 0.1163022853201241,
+    "n_samples": 5000,
+    "quantum_queries": {
+      "percentile": 82800,
+      "null_median": 209900,
+      "benchmark_median": 43100,
+      "total": 335800
+    },
+    "classical_matched_queries": {
+      "shared_set": 209900,
+      "benchmark": 43100,
+      "total": 253000,
+      "separate_sets_total": 335800
+    },
+    "classical_cost_unit": "proposals",
+    "classical_cost_raw": 70000,
+    "units": "percentile 0-100; medians/effects as total-return fractions",
+    "P_F": 0.07492507492507493,
+    "percentile_only": {
+      "quantum_queries": 82800,
+      "classical_queries": 121596,
+      "classical_basis": "analytic: z^2 p(1-p)/(eps^2 P_F) rejection proposals"
+    },
+    "regime": "loose"
+  },
+  "runtime_s": 0.3
+}

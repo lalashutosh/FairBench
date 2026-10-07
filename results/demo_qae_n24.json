@@ -1,0 +1,67 @@
+{
+  "synthetic": true,
+  "noiseless_simulation": true,
+  "n": 24,
+  "k": 8,
+  "seed": 0,
+  "years": 3.0,
+  "premium": 0.08,
+  "planted_rank": 0.7,
+  "results": {
+    "exact": {
+      "percentile": 72.56459637297384,
+      "null_median": 0.1920168825628168,
+      "benchmark_median": 0.2425916283882361,
+      "constraint_effect": -0.05057474582541932,
+      "manager_effect": 0.10611212552627625,
+      "queries": null
+    },
+    "classical": {
+      "percentile": 73.42,
+      "null_median": 0.18648342066833057,
+      "benchmark_median": 0.24281387469539562,
+      "constraint_effect": -0.05633045402706505,
+      "manager_effect": 0.1116455874207567,
+      "queries": 91119
+    },
+    "quantum": {
+      "percentile": 72.48188731469605,
+      "null_median": 0.19243689892450466,
+      "benchmark_median": 0.2430504562498293,
+      "constraint_effect": -0.05061355732532463,
+      "manager_effect": 0.10569210916458838,
+      "queries": 493900
+    },
+    "classical_matched": {
+      "percentile": 72.28003322096829,
+      "null_median": 0.1938545455492111,
+      "benchmark_median": 0.24319460833291595,
+      "constraint_effect": -0.04934006278370484,
+      "manager_effect": 0.10427446253988193,
+      "queries": 370300
+    }
+  },
+  "details": {
+    "method": "iqae",
+    "eps": 0.01,
+    "seed": 0,
+    "fund_return": 0.29812900808909304,
+    "n_samples": 5000,
+    "quantum_queries": {
+      "percentile": 123600,
+      "null_median": 338500,
+      "benchmark_median": 31800,
+      "total": 493900
+    },
+    "classical_matched_queries": {
+      "shared_set": 338500,
+      "benchmark": 31800,
+      "total": 370300,
+      "separate_sets_total": 493900
+    },
+    "classical_cost_unit": "proposals",
+    "classical_cost_raw": 86119,
+    "units": "percentile 0-100; medians/effects as total-return fractions"
+  },
+  "runtime_s": 0.55
+}
