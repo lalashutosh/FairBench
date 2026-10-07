@@ -286,3 +286,57 @@ def scaled_family(n: int, k: int | None = None, seed: int = 0, esg_q: float = 0.
     cc = float(np.quantile(u.carbon[ib].mean(1), carbon_q)) + 1e-9
     cons = [Cardinality(k)] + [SectorCap(f"S{i}", cap) for i in range(ns)] + [MinESG(m), CarbonCap(cc)]
     return u, ConstraintSet(cons)
+
+
+# Typical carbon figure by sector (arbitrary units) for ``named_universe``.
+NAMED_SECTORS: dict[str, float] = {
+    "Energy": 420, "Utilities": 380, "Materials": 300, "Industrials": 140, "Consumer Staples": 90,
+    "Consumer Discretionary": 70, "Real Estate": 60, "Health Care": 35, "Financials": 20,
+    "Information Technology": 25,
+}
+
+
+# country -> (region, share of the universe) for ``named_universe``.
+NAMED_COUNTRIES: dict[str, tuple[str, float]] = {
+    "Finland": ("Nordic", 0.08), "Sweden": ("Nordic", 0.12), "Norway": ("Nordic", 0.07),
+    "Denmark": ("Nordic", 0.08), "Germany": ("Western Europe", 0.15), "France": ("Western Europe", 0.13),
+    "Netherlands": ("Western Europe", 0.07), "United Kingdom": ("Western Europe", 0.12),
+    "United States": ("North America", 0.14), "Canada": ("North America", 0.04),
+}
+
+
+def named_universe(n: int = 100, seed: int = 0) -> Universe:
+    """SYNTHETIC universe that reads like fund data, for mandate demos: ten named sectors
+    (round-robin), carbon set mainly by sector (log-normal around NAMED_SECTORS, slightly
+    lower for better-ESG names), ESG = sector level + noise; flags tobacco,
+    controversial_weapons, thermal_coal, sbti_target (likelier for better-ESG names);
+    categories country and region (NAMED_COUNTRIES); attributes market_cap_eur_bn
+    (log-normal) and board_women_pct. mu/cov come from ``synthetic_universe``."""
+    names = list(NAMED_SECTORS)
+    u = synthetic_universe(n, len(names), seed=seed)
+    r = np.random.default_rng(seed + 11)
+    si = np.arange(n) % len(names)
+    u.sector = [names[i] for i in si]
+    z = r.normal(size=n)
+    u.esg_score = np.clip(r.uniform(45, 65, len(names))[si] + 12 * z, 0, 100)
+    u.carbon = np.array([NAMED_SECTORS[s] for s in u.sector]) * np.exp(0.35 * r.normal(size=n) - 0.15 * z)
+    sec = np.array(u.sector)
+
+    def top(mask: np.ndarray, m: int, key: np.ndarray) -> np.ndarray:
+        idx = np.flatnonzero(mask)
+        f = np.zeros(n, dtype=bool)
+        f[idx[np.argsort(key[idx])[-m:]]] = True
+        return f
+
+    u.flags = {"tobacco": top(sec == "Consumer Staples", 2, -u.esg_score),
+               "controversial_weapons": top(sec == "Industrials", 2, -u.esg_score),
+               "thermal_coal": top(np.isin(sec, ["Energy", "Utilities"]), 3, u.carbon)}
+    # drawn after everything above, so the earlier fields do not depend on these
+    countries = list(NAMED_COUNTRIES)
+    ci = r.choice(len(countries), size=n, p=[NAMED_COUNTRIES[c][1] for c in countries])
+    u.categories = {"country": [countries[i] for i in ci],
+                    "region": [NAMED_COUNTRIES[countries[i]][0] for i in ci]}
+    u.attributes = {"market_cap_eur_bn": np.exp(np.log(8.0) + 1.2 * r.normal(size=n)),
+                    "board_women_pct": np.clip(33 + 8 * r.normal(size=n) + 2 * z, 5, 60)}
+    u.flags["sbti_target"] = r.random(n) < 1.0 / (1.0 + np.exp(-(u.esg_score - 55.0) / 12.0))
+    return u

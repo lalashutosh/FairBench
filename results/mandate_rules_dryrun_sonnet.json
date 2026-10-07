@@ -1,0 +1,152 @@
+{
+  "fund_name": "AURORA SUSTAINABLE EQUITY FUND",
+  "rules": [
+    {
+      "kind": "holdings",
+      "source": "The Fund holds between 18 and 22 equally weighted positions selected from the investment universe.",
+      "note": "Positions are stated to be equally weighted, which is how the benchmark weights holdings, so no separate weighting rule is needed.",
+      "min": 18,
+      "max": 22
+    },
+    {
+      "kind": "position_cap",
+      "source": "No single holding may exceed 7% of the portfolio",
+      "note": "",
+      "max_weight": 0.07
+    },
+    {
+      "kind": "sector_cap",
+      "source": "no more than 15% of the portfolio may be invested in any one sector",
+      "note": "",
+      "sector": "*",
+      "limit": 0.15,
+      "unit": "weight"
+    },
+    {
+      "kind": "min_groups",
+      "source": "The portfolio is spread across at least eight sectors.",
+      "note": "",
+      "category": "sector",
+      "min": 8
+    },
+    {
+      "kind": "require",
+      "source": "The Fund invests only in companies domiciled in the Nordic region or Western Europe.",
+      "note": "Domicile is read as the region category in the universe data.",
+      "by": "region",
+      "values": ["Nordic", "Western Europe"]
+    },
+    {
+      "kind": "group_limit",
+      "source": "No more than 25% of the portfolio may be invested in companies from a single country.",
+      "note": "",
+      "by": "country",
+      "values": ["*"],
+      "bound": "max",
+      "limit": 0.25,
+      "unit": "weight"
+    },
+    {
+      "kind": "exclude_threshold",
+      "source": "Companies with a market capitalisation below EUR 1 billion are not eligible.",
+      "note": "market_cap_eur_bn is in EUR billions, so one billion is 1.",
+      "metric": "market_cap_eur_bn",
+      "side": "below",
+      "value": 1,
+      "basis": "absolute",
+      "scope": "universe"
+    },
+    {
+      "kind": "exclude",
+      "source": "The Fund does not invest in companies involved in the production of tobacco or in controversial weapons.",
+      "note": "The tobacco and controversial_weapons flags are taken to stand for involvement in production; the data cannot show degree of involvement.",
+      "by": "flag",
+      "values": ["tobacco", "controversial_weapons"]
+    },
+    {
+      "kind": "exclude",
+      "source": "Companies that derive more than 5% of their revenue from thermal coal are excluded.",
+      "note": "The thermal_coal flag is taken to stand for the 5% revenue threshold; the data cannot show revenue shares.",
+      "by": "flag",
+      "values": ["thermal_coal"]
+    },
+    {
+      "kind": "exclude_threshold",
+      "source": "Within each sector, the companies whose ESG score falls in the lowest 20% of that sector are not eligible for investment.",
+      "note": "",
+      "metric": "esg",
+      "side": "below",
+      "value": 20,
+      "basis": "percentile",
+      "scope": "sector"
+    },
+    {
+      "kind": "portfolio_average",
+      "source": "The average ESG score of the portfolio must be at least 5% higher than the average of the investment universe.",
+      "note": "The portfolio average is treated as an average over holdings.",
+      "metric": "esg",
+      "bound": "min",
+      "value": 1.05,
+      "basis": "relative_to_mean"
+    },
+    {
+      "kind": "portfolio_average",
+      "source": "The portfolio's average carbon intensity must be at least 25% below that of the investment universe.",
+      "note": "Carbon intensity is read as the carbon field; the average is treated as an average over holdings.",
+      "metric": "carbon",
+      "bound": "max",
+      "value": 0.75,
+      "basis": "relative_to_mean"
+    },
+    {
+      "kind": "portfolio_average",
+      "source": "On average, women must make up at least 34% of the board members of portfolio companies.",
+      "note": "The average is treated as an average over holdings.",
+      "metric": "board_women_pct",
+      "bound": "min",
+      "value": 34,
+      "basis": "absolute"
+    },
+    {
+      "kind": "group_limit",
+      "source": "At least half of the portfolio is invested in companies with validated science-based emissions reduction targets.",
+      "note": "The sbti_target flag is taken to mean validated science-based targets.",
+      "by": "flag",
+      "values": ["sbti_target"],
+      "bound": "min",
+      "limit": 0.5,
+      "unit": "weight"
+    },
+    {
+      "kind": "unmapped",
+      "source": "The Fund aims to reduce the carbon intensity of the portfolio by 7% each year.",
+      "note": "",
+      "reason": "A target that changes over time. It would need historical or multi-period carbon data for the portfolio, and the universe data is a single snapshot."
+    },
+    {
+      "kind": "risk_limit",
+      "source": "The expected tracking error of the portfolio against the investment universe will not exceed 6% per year.",
+      "note": "",
+      "measure": "tracking_error",
+      "max": 0.06
+    },
+    {
+      "kind": "unmapped",
+      "source": "At least 80% of the Fund's assets will be invested in companies whose activities are aligned with the EU Taxonomy.",
+      "note": "",
+      "reason": "The universe has no EU Taxonomy alignment flag or field. Data on each company's Taxonomy-aligned share of activities would be needed."
+    },
+    {
+      "kind": "unmapped",
+      "source": "The manager votes at all shareholder meetings",
+      "note": "",
+      "reason": "A voting commitment about manager conduct, not a restriction on which assets are held. It cannot be tested with asset data."
+    },
+    {
+      "kind": "unmapped",
+      "source": "engages with investee companies on their climate transition plans.",
+      "note": "",
+      "reason": "An engagement commitment about manager conduct, not a restriction on which assets are held. It cannot be tested with asset data."
+    }
+  ]
+}

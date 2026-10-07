@@ -315,6 +315,10 @@ def feasibility_oracle(u: Universe, cs: ConstraintSet, bits: int | str | None = 
     if mode not in ("phase", "bit"):
         raise ValueError("mode must be 'phase' or 'bit'")
     n, k = u.n, _k_of(cs)
+    unknown = sorted({type(c).__name__ for c in cs.constraints
+                      if not isinstance(c, (Cardinality, Exclusion, SectorCap, MinESG, CarbonCap))})
+    if unknown:
+        raise TypeError(f"no oracle encoding for {unknown}")
     qz = quant if quant is not None else quantise(u, cs, bits, **quant_kw)
     B = _Builder(n)
     target = B.alloc(1, "target")[0] if mode == "bit" else None

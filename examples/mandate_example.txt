@@ -1,0 +1,32 @@
+AURORA SUSTAINABLE EQUITY FUND - INVESTMENT POLICY
+(Fictional example written for the FairBench demo. Not a real fund.)
+
+1. Objective
+The Fund aims to deliver long-term capital growth by investing in companies that manage environmental, social and governance risks well.
+
+2. Portfolio construction
+The Fund holds between 18 and 22 equally weighted positions selected from the investment universe. No single holding may exceed 7% of the portfolio, and no more than 15% of the portfolio may be invested in any one sector. The portfolio is spread across at least eight sectors.
+
+3. Geography and size
+The Fund invests only in companies domiciled in the Nordic region or Western Europe. No more than 25% of the portfolio may be invested in companies from a single country. Companies with a market capitalisation below EUR 1 billion are not eligible.
+
+4. Exclusions
+The Fund does not invest in companies involved in the production of tobacco or in controversial weapons. Companies that derive more than 5% of their revenue from thermal coal are excluded.
+
+5. Best-in-class screen
+Within each sector, the companies whose ESG score falls in the lowest 20% of that sector are not eligible for investment.
+
+6. Portfolio-level targets
+The average ESG score of the portfolio must be at least 5% higher than the average of the investment universe. The portfolio's average carbon intensity must be at least 25% below that of the investment universe. On average, women must make up at least 34% of the board members of portfolio companies.
+
+7. Climate commitments
+At least half of the portfolio is invested in companies with validated science-based emissions reduction targets. The Fund aims to reduce the carbon intensity of the portfolio by 7% each year.
+
+8. Risk
+The expected tracking error of the portfolio against the investment universe will not exceed 6% per year.
+
+9. Sustainable investments
+At least 80% of the Fund's assets will be invested in companies whose activities are aligned with the EU Taxonomy.
+
+10. Stewardship
+The manager votes at all shareholder meetings and engages with investee companies on their climate transition plans.

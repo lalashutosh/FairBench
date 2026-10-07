@@ -9,63 +9,63 @@
   "seed": 0,
   "total_return": {
     "metric": "total_return",
-    "fund": 0.19424425932039702,
+    "fund": 0.2026748234134066,
     "benchmark": 0.23642827011530232,
     "benchmark_label": "median random portfolio, k=20, no other rule",
-    "percentile": 68.54,
-    "percentile_se": 0.6566990787263219,
-    "null_median": 0.1426727004767644,
+    "percentile": 69.34,
+    "percentile_se": 0.6520681559469071,
+    "null_median": 0.14908954400332497,
     "null_median_ci": [
-      0.13982981614753554,
-      0.1471387890693463
+      0.1455735842597794,
+      0.15179437470100843
     ],
-    "constraint_effect": -0.09375556963853793,
+    "constraint_effect": -0.08733872611197735,
     "constraint_effect_ci": [
-      -0.09902404887127718,
-      -0.08803105988579978
+      -0.09299883697967798,
+      -0.0828509456254189
     ],
-    "manager_effect": 0.051571558843632626,
+    "manager_effect": 0.05358527941008162,
     "manager_effect_ci": [
-      0.04710547025105072,
-      0.05441444317286148
+      0.05088044871239816,
+      0.05710123915362719
     ],
     "fund_feasible": true,
-    "cost": 1401758,
+    "cost": 136669,
     "cost_unit": "proposals",
     "sampler": "rejection_sampler",
     "weight_scheme": "equal",
-    "active": -0.0421840107949053,
+    "active": -0.03375344670189573,
     "n_null": 5000,
     "n_unconstrained": 5000
   },
   "sharpe": {
     "metric": "sharpe",
-    "fund": 1.5943157490547366,
+    "fund": 1.1682247104664816,
     "benchmark": 1.4730898175511093,
     "benchmark_label": "median random portfolio, k=20, no other rule",
-    "percentile": 85.04,
-    "percentile_se": 0.5044201423416793,
-    "null_median": 0.95996111604041,
+    "percentile": 60.46,
+    "percentile_se": 0.6914605411735365,
+    "null_median": 1.0043559250526102,
     "null_median_ci": [
-      0.9431247837911576,
-      0.9814767456637117
+      0.979693753877858,
+      1.0290710032670198
     ],
-    "constraint_effect": -0.5131287015106993,
+    "constraint_effect": -0.46873389249849917,
     "constraint_effect_ci": [
-      -0.5440084809442322,
-      -0.4831055586166584
+      -0.504487513032778,
+      -0.4363409629876739
     ],
-    "manager_effect": 0.6343546330143266,
+    "manager_effect": 0.1638687854138714,
     "manager_effect_ci": [
-      0.6128390033910249,
-      0.651190965263579
+      0.13915370719946174,
+      0.18853095658862362
     ],
     "fund_feasible": true,
-    "cost": 1401758,
+    "cost": 136669,
     "cost_unit": "proposals",
     "sampler": "rejection_sampler",
     "weight_scheme": "equal",
-    "active": 0.12122593150362726,
+    "active": -0.3048651070846278,
     "n_null": 5000,
     "n_unconstrained": 5000
   }

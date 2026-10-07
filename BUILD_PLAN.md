@@ -181,3 +181,78 @@ Demo (SYNTHETIC, planted ground truth; `scripts/demo_attribution.py`, seed 0):
 
 Pitch-safe wording: *On a synthetic case with a planted effect, the tool recovers both the cost of the rules and the fund's planted rank; swapping the classical sampler for the Dicke circuit gives the same attribution within Monte Carlo error. No real fund has been analysed, holdings are static over the window, and a single window's percentile is not evidence of skill.*
 
+---
+# M — AI mandate layer (2026-10-07)
+
+Base: commit 8e9dbbd. Goal: turn a fund's ESG policy text into the numeric constraints the engine uses, with every number traceable.
+
+Pipeline: `mandate text --(Claude, structured output)--> rule spec (JSON) --(compile_spec, deterministic)--> ConstraintSet + per-rule report`.
+
+Files:
+- `fairbench/rules.py` (problem-agnostic, no model call): `SPEC_SCHEMA`, `validate_spec`, `load_spec`/`save_spec`, `compile_spec(spec, u, k) -> CompiledRules` (`constraint_set`, per-rule `status`/`detail`, `warnings`, `report()`, `check_fund()`), `feasible_fraction`.
+- `fairbench/mandate.py` (AI layer): `SYSTEM_PROMPT`, `universe_summary`, `build_request`, `extract_rules`, `unverified_sources`, `mandate_to_constraints`. Model `claude-opus-5-5`, `output_config.format` = `SPEC_SCHEMA`, effort high, server-side refusal fallback on. Optional dependency: `uv pip install -e ".[ai]"`.
+- `fairbench/data.py`: `Universe.flags` (name -> bool array), read from `flag_<name>` CSV columns.
+- `fairbench/constraints.py`: `ConstraintSet.allowed_indices(n)`.
+- `fairbench/instances.py`: `named_universe(n, seed)` (named sectors, flags; carbon set mainly by sector).
+- `examples/mandate_example.txt` (fictional fund) + `examples/mandate_example.rules.json` (hand-written reference spec).
+- `scripts/demo_mandate.py` (`--live` calls the API; default uses the reference spec).
+
+Design decisions:
+- The model translates language into the spec vocabulary only. It sees names and scales (sectors, flags, tickers, min/mean/max), never per-asset values. Thresholds, counts and excluded assets are computed in `compile_spec`.
+- Relative statements stay relative in the spec (`relative_to_mean 0.7`, `percentile 20`), so a spec can be reused on another universe or date.
+- Every rule carries a verbatim `source` quote; `unverified_sources` checks the quote is in the text.
+- Rules with no numeric form are kept as `unmapped` with a reason, never dropped.
+- Sector weight caps and portfolio averages assume equally weighted holdings (as the constraints do): cap = floor(limit x k) names.
+
+Sampler change (affects earlier numbers): `rejection_sampler` and `dicke_sampler` now draw k-subsets of the non-excluded assets only (still exactly uniform on the feasible set; exclusions cost no proposals and no qubits). `scripts/demo_attribution.py` re-run, seed 0:
+
+| quantity | before | now |
+|---|---|---|
+| proposals per feasible sample (n=100 headline) | 280 | 27.3 |
+| fund / benchmark / same-rules median | 19.42% / 23.64% / 14.27% | 20.27% / 23.64% / 14.91% |
+| active = constraint + manager | -4.22 = -9.38 + 5.16 | -3.38 = -8.73 + 5.36 |
+| percentile (planted 70) | 68.5 +/- 0.7 | 69.3 +/- 0.7 |
+| n=16 swap: exact / rejection / Dicke | 69.0 / 69.8 / 68.7, KS p=0.82 | 68.3 / 68.5 / 67.5, KS p=0.24; Dicke on 14 qubits |
+
+(The planted fund differs between the two runs because the pool it is drawn from uses the sampler. Deck slides 4, 5 and 9 were updated to the new numbers.)
+
+Mandate demo (SYNTHETIC; `scripts/demo_mandate.py`, reference spec, seed 0, 8 s): 10 rules = 7 mapped, 1 trivial (7% position cap holds at 1/k = 5%), 2 unmapped (EU Taxonomy share, stewardship). 23 of 100 assets excluded; feasible fraction 0.57% [0.50%, 0.64%] of 20-name portfolios from the remaining 77. Attribution: fund 16.74%, benchmark 23.29%, same-rules median 11.44%; active -6.55 = constraint -11.85 [-12.39, -11.31] + manager +5.30; percentile 71.5 +/- 0.6 (planted 70).
+
+Validation status of the AI layer:
+- Offline tests with a fake client (request shape, parsing, refusal/max_tokens/invalid JSON handling): `tests/test_rules.py` and `tests/test_mandate.py` (156 tests together), written by a Sonnet agent against the spec; they found one bug (`validate_spec` raised TypeError on a non-string `kind`), now fixed. `validate_spec` also rejects out-of-range values (15 written for 15%, a percentile above 100). 411 tests green.
+- Prompt dry run: a Claude Sonnet agent was given the exact system prompt, user message and schema, with no access to the repo. Its spec (`results/mandate_rules_dryrun_sonnet.json`) validated, had no unverified quotes, matched the reference on every enforceable rule, and compiled to an identical constraint set (checked on 20k random portfolios). It split the stewardship sentence into two unmapped rules. One prompt line on equal weighting was added afterwards.
+- **Not yet done: a live API call** (`--live`). No API key was available in the session. The dry run used a different model and no structured-output enforcement, so it is evidence about the prompt, not about the production path.
+
+Pitch-safe wording: *An AI layer reads a fund's policy text and writes a structured rule spec; deterministic code turns the spec into numeric constraints and shows, sentence by sentence, what was enforced and what could not be. On a fictional mandate the extracted rules matched a hand-written reference. It has been tested on one fictional mandate and not on real fund documents.*
+
+---
+# M2 — more constraint types (2026-10-07)
+
+Request: the five constraint classes were too few to express real mandates. Added five classes and five rule kinds; the AI layer and the compiler use them.
+
+New constraint classes (`fairbench/constraints.py`):
+
+| Class | Meaning | Typical mandate sentence |
+|---|---|---|
+| `CountBound(indices, min_count, max_count)` | number of holdings inside any asset group | "at least half in companies with science-based targets", "max 25% per country" |
+| `AvgBound(attribute, lower, upper)` | portfolio average of any numeric field | "boards at least 34% women on average" |
+| `MinGroups(category, min_groups)` | distinct sectors/countries held | "spread across at least eight sectors" |
+| `VolatilityCap(max_vol)` | sqrt(w' cov w), equal weights | "volatility below 15%" |
+| `TrackingErrorCap(max_te, benchmark)` | sqrt((w-b)' cov (w-b)), b = equal-weight universe by default | "tracking error will not exceed 6%" |
+
+Data model: `Universe.attributes` (name -> floats), `Universe.categories` (name -> labels), `Universe.numeric(name)` / `.labels(name)`; CSV columns `attr_<name>`, `cat_<name>`.
+
+New rule kinds (`fairbench/rules.py`): `require`, `group_limit` (values `["*"]` = every value of a category), `threshold_share`, `min_groups`, `risk_limit`. `by` and `metric` are now names resolved against the universe (sector / ticker / flag / any category; esg / carbon / any attribute); unknown names compile to `unmapped`. `portfolio_average` accepts any field and both bounds. A weight share becomes floor(limit x k) names for a maximum and ceil(limit x k) for a minimum. `validate_spec` rejects out-of-range values.
+
+`ConstraintSet.check_batch` now runs cheap constraints first and gives later ones only the rows still feasible (same result; the mandate demo went from 76 s to 15 s).
+
+Scope limits, stated plainly:
+- The new classes are enforced by the samplers and attribution. `quantum/hamiltonian.penalty_operator` and `ft/oracle.feasibility_oracle` encode only the original five and raise `TypeError` otherwise (the oracle guard is new; before, unknown classes would have been skipped silently).
+- Risk limits use `u.cov`, equal weights and the equal-weight universe as benchmark.
+- Still unmapped: non-equal weighting schemes, time-varying targets, letter ratings, anything without data.
+
+Example mandate (fictional, rewritten to exercise the new kinds) on `named_universe(150)`, `scripts/demo_mandate.py`, reference spec, seed 0, 15 s: 18 rules = 14 mapped, 1 trivial, 3 unmapped. 58 of 150 assets excluded; feasible fraction 0.54% [0.48%, 0.61%]. Attribution: fund 20.26%, benchmark 21.73%, same-rules median 15.45%; active -1.48 = constraint -6.29 [-6.80, -5.83] + manager +4.81; percentile 70.4 +/- 0.6 (planted 70). These replace the M numbers above (10 rules, n = 100).
+
+Prompt dry run repeated with the new prompt (Claude Sonnet agent, no repo access, `results/mandate_rules_dryrun_sonnet.json`): valid spec, no unverified quotes, identical on all 15 enforceable rules including every new kind, identical compiled constraint set on 60k portfolios; it split the stewardship sentence into two unmapped rules. Still no live API call.
+
+Tests after M2: 578 green (~40 s). `tests/test_constraints_extra.py` (new classes, data fields, oracle/Hamiltonian guards, samplers) and the extended `tests/test_rules.py` / `tests/test_mandate.py` were written by a Sonnet agent, including a brute-force check of a 16-rule spec against an independent evaluation over all 495 subsets of a 12-asset universe. Follow-up from its report: name counts must be whole numbers (`validate_spec`).

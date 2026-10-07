@@ -1,0 +1,157 @@
+{
+  "synthetic": true,
+  "mandate": "mandate_example.txt",
+  "spec_source": "hand-written reference mandate_example.rules.json",
+  "k": 20,
+  "rules": [
+    {
+      "kind": "holdings",
+      "status": "mapped",
+      "detail": "Cardinality(k=20)  [mandate: 18-22]",
+      "source": "The Fund holds between 18 and 22 equally weighted positions selected from the investment universe."
+    },
+    {
+      "kind": "position_cap",
+      "status": "trivial",
+      "detail": "equal weights give 1/k = 5.0% <= 7.0%",
+      "source": "No single holding may exceed 7% of the portfolio"
+    },
+    {
+      "kind": "sector_cap",
+      "status": "mapped",
+      "detail": "SectorCap(each sector, floor(15% x 20) = 3 names)",
+      "source": "no more than 15% of the portfolio may be invested in any one sector"
+    },
+    {
+      "kind": "min_groups",
+      "status": "mapped",
+      "detail": "MinGroups(at least 8 distinct sector values; 10 in the universe)",
+      "source": "The portfolio is spread across at least eight sectors."
+    },
+    {
+      "kind": "require",
+      "status": "mapped",
+      "detail": "only region in ['Nordic', 'Western Europe'] (123 assets eligible): excludes A005, A017, A022, A024, A025, A026, ... (27 assets)",
+      "source": "The Fund invests only in companies domiciled in the Nordic region or Western Europe."
+    },
+    {
+      "kind": "group_limit",
+      "status": "mapped",
+      "detail": "at most floor(25% x 20) = 5 names in each country (10 of them)",
+      "source": "No more than 25% of the portfolio may be invested in companies from a single country."
+    },
+    {
+      "kind": "exclude_threshold",
+      "status": "mapped",
+      "detail": "market_cap_eur_bn below 1 (absolute 1): excludes A001, A008, A026, A125, A130, A134, ... (7 assets)",
+      "source": "Companies with a market capitalisation below EUR 1 billion are not eligible."
+    },
+    {
+      "kind": "exclude",
+      "status": "mapped",
+      "detail": "flag in ['tobacco', 'controversial_weapons']: excludes A024, A043, A044, A143 (4 assets)",
+      "source": "The Fund does not invest in companies involved in the production of tobacco or in controversial weapons."
+    },
+    {
+      "kind": "exclude",
+      "status": "mapped",
+      "detail": "flag in ['thermal_coal']: excludes A071, A080, A091 (3 assets)",
+      "source": "Companies that derive more than 5% of their revenue from thermal coal are excluded."
+    },
+    {
+      "kind": "exclude_threshold",
+      "status": "mapped",
+      "detail": "esg below 34.26..51.31 by sector (percentile 20): excludes A009, A020, A021, A023, A024, A027, ... (30 assets)",
+      "source": "Within each sector, the companies whose ESG score falls in the lowest 20% of that sector are not eligible for investment."
+    },
+    {
+      "kind": "portfolio_average",
+      "status": "mapped",
+      "detail": "MinESG(average >= 57.03)  [relative_to_mean 1.05; universe mean 54.31]",
+      "source": "The average ESG score of the portfolio must be at least 5% higher than the average of the investment universe."
+    },
+    {
+      "kind": "portfolio_average",
+      "status": "mapped",
+      "detail": "CarbonCap(average <= 124)  [relative_to_mean 0.75; universe mean 165.3]",
+      "source": "The portfolio's average carbon intensity must be at least 25% below that of the investment universe."
+    },
+    {
+      "kind": "portfolio_average",
+      "status": "mapped",
+      "detail": "AvgBound(average board_women_pct >= 34)  [absolute 34; universe mean 33.31]",
+      "source": "On average, women must make up at least 34% of the board members of portfolio companies."
+    },
+    {
+      "kind": "group_limit",
+      "status": "mapped",
+      "detail": "CountBound(at least ceil(50% x 20) = 10 names in assets flagged sbti_target; 80 such assets)",
+      "source": "At least half of the portfolio is invested in companies with validated science-based emissions reduction targets."
+    },
+    {
+      "kind": "unmapped",
+      "status": "unmapped",
+      "detail": "A target that changes from year to year needs a time series of carbon data and a reference year; the spec describes one point in time.",
+      "source": "The Fund aims to reduce the carbon intensity of the portfolio by 7% each year."
+    },
+    {
+      "kind": "risk_limit",
+      "status": "mapped",
+      "detail": "TrackingErrorCap(tracking error <= 6.0% against the equal-weight universe)",
+      "source": "The expected tracking error of the portfolio against the investment universe will not exceed 6% per year."
+    },
+    {
+      "kind": "unmapped",
+      "status": "unmapped",
+      "detail": "The universe data has no EU Taxonomy alignment flag or field.",
+      "source": "At least 80% of the Fund's assets will be invested in companies whose activities are aligned with the EU Taxonomy."
+    },
+    {
+      "kind": "unmapped",
+      "status": "unmapped",
+      "detail": "Voting and engagement commitments do not restrict which assets may be held.",
+      "source": "The manager votes at all shareholder meetings and engages with investee companies on their climate transition plans."
+    }
+  ],
+  "warnings": [],
+  "excluded_assets": 58,
+  "feasible_fraction": {
+    "estimate": 0.00542,
+    "low": 0.004813338355133376,
+    "high": 0.006102654947269215
+  },
+  "planted_premium": 0.08,
+  "planted_rank": 0.7,
+  "seed": 0,
+  "attribution": {
+    "metric": "total_return",
+    "fund": 0.2025712025720694,
+    "benchmark": 0.2173433448906561,
+    "benchmark_label": "median random portfolio, k=20, no other rule",
+    "percentile": 70.36,
+    "percentile_se": 0.6458282124528163,
+    "null_median": 0.15448707060767608,
+    "null_median_ci": [
+      0.15188376674883464,
+      0.15765278836773566
+    ],
+    "constraint_effect": -0.06285627428298002,
+    "constraint_effect_ci": [
+      -0.06797195710537562,
+      -0.058289542146826495
+    ],
+    "manager_effect": 0.04808413196439332,
+    "manager_effect_ci": [
+      0.044918414204333734,
+      0.05068743582323476
+    ],
+    "fund_feasible": true,
+    "cost": 941728,
+    "cost_unit": "proposals",
+    "sampler": "rejection_sampler",
+    "weight_scheme": "equal",
+    "active": -0.0147721423185867,
+    "n_null": 5000,
+    "n_unconstrained": 5000
+  }
+}

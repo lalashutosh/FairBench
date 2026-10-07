@@ -17,10 +17,35 @@ class Universe:
     esg_score: np.ndarray  # (n,)
     carbon: np.ndarray  # (n,)
     returns: pd.DataFrame | None = None  # historical returns (T, n), for attribution
+    flags: dict[str, np.ndarray] | None = None  # name -> (n,) bool, e.g. business involvement
+    attributes: dict[str, np.ndarray] | None = None  # name -> (n,) float, e.g. market cap
+    categories: dict[str, list[str]] | None = None  # name -> (n,) labels, e.g. country
 
     @property
     def n(self) -> int:
         return len(self.tickers)
+
+    def numeric(self, name: str) -> np.ndarray | None:
+        """Per-asset numbers by name: "esg", "carbon" or a key of ``attributes``; None if absent."""
+        if name == "esg":
+            return np.asarray(self.esg_score, dtype=float)
+        if name == "carbon":
+            return np.asarray(self.carbon, dtype=float)
+        v = (self.attributes or {}).get(name)
+        return None if v is None else np.asarray(v, dtype=float)
+
+    def labels(self, name: str) -> np.ndarray | None:
+        """Per-asset labels by name: "sector" or a key of ``categories``; None if absent."""
+        v = self.sector if name == "sector" else (self.categories or {}).get(name)
+        return None if v is None else np.asarray(v, dtype=str)
+
+    @property
+    def numeric_names(self) -> list[str]:
+        return ["esg", "carbon"] + sorted(self.attributes or {})
+
+    @property
+    def label_names(self) -> list[str]:
+        return ["sector"] + sorted(self.categories or {})
 
 
 def load_universe(csv_path: str | Path, cov_path: str | Path | None = None,
@@ -28,7 +53,10 @@ def load_universe(csv_path: str | Path, cov_path: str | Path | None = None,
     """Load a universe from CSV.
 
     Schema (one row per asset, header required):
-        ticker, mu, sector, esg_score, carbon [, sigma]
+        ticker, mu, sector, esg_score, carbon [, sigma] [, flag_<name>, attr_<name>, cat_<name> ...]
+    Columns named ``flag_<name>`` (0/1) become ``flags[<name>]``, e.g. ``flag_tobacco``;
+    ``attr_<name>`` (numbers) become ``attributes[<name>]``; ``cat_<name>`` (labels) become
+    ``categories[<name>]``.
     Covariance:
       * if ``cov_path`` is given: an n x n CSV with ticker header row and ticker
         index column (``pd.read_csv(index_col=0)``), reordered to match tickers;
@@ -59,6 +87,9 @@ def load_universe(csv_path: str | Path, cov_path: str | Path | None = None,
         esg_score=df["esg_score"].to_numpy(dtype=float),
         carbon=df["carbon"].to_numpy(dtype=float),
         returns=None if returns_path is None else load_returns(returns_path, tickers),
+        flags={c[5:]: df[c].to_numpy().astype(bool) for c in df.columns if c.startswith("flag_")} or None,
+        attributes={c[5:]: df[c].to_numpy(dtype=float) for c in df.columns if c.startswith("attr_")} or None,
+        categories={c[4:]: df[c].astype(str).tolist() for c in df.columns if c.startswith("cat_")} or None,
     )
 
 

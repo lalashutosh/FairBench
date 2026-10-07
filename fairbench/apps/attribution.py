@@ -21,6 +21,7 @@ MCMC chain) biases the null and therefore the attribution.
 """
 from __future__ import annotations
 
+import textwrap
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,25 +67,53 @@ def _sample_until(draw: Callable[[int, int], np.ndarray], u: Universe, cs: Const
                         info={"n_accepted": have})
 
 
+def _allowed(cs: ConstraintSet, n: int, k: int) -> np.ndarray:
+    allowed = cs.allowed_indices(n)
+    if allowed.size < k:
+        raise RuntimeError(f"exclusions leave {allowed.size} assets, fewer than k={k}")
+    return allowed
+
+
+def _lift(draw: Callable[[int, int], np.ndarray], allowed: np.ndarray, n: int):
+    """Turn ``draw(m, seed) -> (m, len(allowed))`` into (m, n) selections."""
+    def lifted(m: int, seed: int) -> np.ndarray:
+        X = np.zeros((m, n), dtype=np.uint8)
+        X[:, allowed] = draw(m, seed)
+        return X
+
+    return lifted
+
+
 def rejection_sampler(u: Universe, cs: ConstraintSet, n_samples: int, seed: int | None = None,
                       max_batch: int = 20_000, max_cost: int = 20_000_000) -> SampleResult:
-    """Exactly ``n_samples`` uniform feasible selections by classical rejection
-    (uniform random k-subsets, keep feasible). cost = proposals drawn."""
-    n, k = u.n, _k(cs)
-    return _sample_until(lambda m, s: random_k_subsets(n, k, m, s), u, cs, n_samples, seed,
-                         "proposals", max_batch, max_cost)
+    """Exactly ``n_samples`` uniform feasible selections by classical rejection: uniform
+    random k-subsets of the assets no Exclusion forbids, keep the feasible ones (still
+    uniform on the feasible set, since every feasible selection avoids excluded assets).
+    cost = proposals drawn."""
+    k = _k(cs)
+    allowed = _allowed(cs, u.n, k)
+    draw = _lift(lambda m, s: random_k_subsets(allowed.size, k, m, s), allowed, u.n)
+    return _sample_until(draw, u, cs, n_samples, seed, "proposals", max_batch, max_cost)
 
 
 def dicke_sampler(backend: str = "aer_statevector", circuit=None, params=None,
                   max_batch: int = 20_000, max_cost: int = 20_000_000, **backend_kwargs) -> Sampler:
-    """Sampler factory for the quantum backend: measure the Dicke(n, k) state (uniform
-    over k-subsets), keep feasible shots. Same distribution as ``rejection_sampler``.
-    Pass ``circuit``/``params`` to use another ansatz; a trained ansatz is NOT uniform
-    on the feasible set and biases the null. cost = shots."""
+    """Sampler factory for the quantum backend: measure the Dicke(n_allowed, k) state
+    (uniform over k-subsets of the non-excluded assets, so exclusions cost no qubits),
+    keep feasible shots. Same distribution as ``rejection_sampler``.
+    Pass ``circuit``/``params`` (acting on all n assets) to use another ansatz; a trained
+    ansatz is NOT uniform on the feasible set and biases the null. cost = shots."""
     def sampler(u: Universe, cs: ConstraintSet, n_samples: int, seed: int | None = None) -> SampleResult:
-        qc = build_ansatz(u.n, _k(cs), 0, None) if circuit is None else circuit
-        return _sample_until(lambda m, s: sample(qc, params, m, backend=backend, seed=s, **backend_kwargs),
-                             u, cs, n_samples, seed, "shots", max_batch, max_cost)
+        k = _k(cs)
+        if circuit is None:
+            allowed = _allowed(cs, u.n, k)
+            qc = build_ansatz(allowed.size, k, 0, None)
+            draw = _lift(lambda m, s: sample(qc, None, m, backend=backend, seed=s, **backend_kwargs),
+                         allowed, u.n)
+        else:
+            def draw(m, s):
+                return sample(circuit, params, m, backend=backend, seed=s, **backend_kwargs)
+        return _sample_until(draw, u, cs, n_samples, seed, "shots", max_batch, max_cost)
 
     sampler.__name__ = f"dicke[{backend}]"
     return sampler
@@ -380,9 +409,10 @@ def plot_attribution(res: AttributionResult, path: str | Path | None = None,
         t.set_color(_INK)
     ax.set_title(title or f"Fund sits at percentile {res.percentile:.0f} of portfolios that follow its rules",
                  loc="left", fontsize=13, color=_INK, pad=12)
-    if note:
-        fig.text(0.012, 0.012, note, fontsize=8.5, color=_INK2, ha="left", va="bottom")
-    fig.tight_layout(rect=(0, 0.03 if note else 0, 1, 1))
+    lines = textwrap.wrap(note, 135) if note else []
+    if lines:
+        fig.text(0.012, 0.012, "\n".join(lines), fontsize=8.5, color=_INK2, ha="left", va="bottom")
+    fig.tight_layout(rect=(0, 0.03 * len(lines), 1, 1))
     if path is not None:
         fig.savefig(path, dpi=160, facecolor=_SURFACE)
     return fig
