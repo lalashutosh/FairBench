@@ -33,7 +33,7 @@ from .estimators import (AEResult, IdealOracle, SubspaceOracle, canonical_ae, cl
                          ratio_estimate, _z)
 
 __all__ = ["linear_return_scores", "portfolio_score", "ExactInstance", "exact_masks",
-           "make_oracle", "run_ae", "qae_percentile", "qae_quantile", "qae_attribute",
+           "make_oracle", "run_ae", "qae_percentile", "qae_quantile", "qae_quantile_hybrid", "qae_attribute",
            "classical_percentile", "classical_quantile", "QAEResult", "QAEAttribution",
            "RankTable", "iid_shared_sample", "SwapChainBank", "swap_connectivity", "exhaustive_cost"]
 
@@ -318,6 +318,128 @@ def qae_quantile(u: Universe, cs: ConstraintSet, q: float = 0.5, method: str = "
                           resolution=hi - lo))
 
 
+def _ae_to_halfwidth(oracle, eps_a: float, a_guess: float, rng, alpha: float = 0.05,
+                     ae: str = "iqae", n_shots: int = 100, mlae_shots: int = 30) -> AEResult:
+    """One AE run aiming at an absolute amplitude CI half-width ``eps_a`` for an amplitude near
+    ``a_guess`` (no pilot; the guess comes from the classical warm start). iqae: eps_theta =
+    eps_a / (2 sqrt(a (1-a))). mlae: smallest exponential schedule (m = 0,1,2,..,2^(K-2), shots
+    per m) whose Fisher-information half-width z sqrt(a(1-a)) / sqrt(sum shots (2m+1)^2) <= eps_a."""
+    a_g = min(max(a_guess, eps_a / 2), 1 - eps_a / 2)
+    if ae == "iqae":
+        return iqae(oracle, min(0.45, eps_a / (2 * math.sqrt(a_g * (1 - a_g)))), alpha, rng, n_shots=n_shots)
+    z = _z(1 - alpha)
+    for K in range(2, 40):
+        sched = exp_schedule(K)
+        info = sum(mlae_shots * (2 * m + 1) ** 2 for m in sched)
+        if z * math.sqrt(a_g * (1 - a_g) / info) <= eps_a:
+            break
+    return mlae(oracle, sched, mlae_shots, rng, conf=1 - alpha)
+
+
+def qae_quantile_hybrid(u: Universe, cs: ConstraintSet, q: float = 0.5, eps: float = 0.01,
+                        m0: int = 40, alpha: float = 0.05, shrink: float = 0.5, max_iter: int = 12,
+                        rng: np.random.Generator | None = None, cardinality_only: bool = False,
+                        inst: ExactInstance | None = None, oracle_kind: str = "auto",
+                        rel_F: float | None = None, n_shots: int = 100,
+                        ae: str = "iqae", mlae_shots: int = 30, aF_run: AEResult | None = None) -> QAEResult:
+    """Hybrid classical/quantum q-quantile (default q = 1/2): warm-started rank-correction iteration.
+
+    1. CLASSICAL WARM START (charged): propose uniform weight-k subsets until ``m0`` feasible ones
+       are seen (N0 ~ m0 / P_F proposals; ``cardinality_only``: N0 = m0). Their sorted scores give a
+       piecewise-linear empirical CDF F0 (rank of a threshold s) and quantile function QF0.
+    2. a_F by IQAE to relative precision ``rel_F`` (default eps), unless ``aF_run`` (a finished
+       a_F AE run, e.g. the percentile's) is supplied -- then it is reused and NOT charged again.
+    3. Rank-correction loop: s_t = QF0(p_t); ONE AE of a_G(s_t) to rank half-width
+       h_t = max(eps, shrink * gap_{t-1}) (gap_0 = 1/sqrt(m0) ~ 2 sd of the empirical rank error;
+       the amplitude precision is warm-started from the classical a_G guess, so no AE pilot).
+       Measured rank r_t = a_G/a_F -> p_{t+1} = F0(s_t) + (q - r_t): the empirical CDF supplies the
+       local SHAPE, the AE supplies the exact rank OFFSET. Stops after the run with h_t = eps; the
+       returned estimate is QF0(p_final) (a last shift using that run's measured offset).
+    Cost = N0 + a_F + sum_t cost(h_t) ~ m0/P_F + geometric series ending in ONE AE at rank precision eps
+    (vs ~14 sequential sequential-test AE runs for bisection). Unlike bisection, the answer is a
+    point estimate, not a guaranteed bracket; its rank error is ~ eps/1.96 + second-order terms."""
+    rng = rng or np.random.default_rng(0)
+    inst = inst or ExactInstance.build(u, cs, cardinality_only)
+    cardinality_only = bool(np.all(inst.feasible))
+    sf = inst._sf
+    q_total, aF_q = 0, 0
+    if cardinality_only:
+        N0, aF = int(m0), 1.0
+    else:
+        N0 = int(m0 + rng.negative_binomial(m0, inst.a_F))
+        if aF_run is not None:
+            rF = aF_run
+        else:
+            if ae == "iqae":
+                runs = _adaptive_iqae(make_oracle(inst.feasible, oracle_kind), rng, alpha,
+                                      rel_eps=min(0.5, rel_F or eps), n_shots=n_shots)
+                rF = runs[-1]
+                aF_q = sum(r.oracle_queries for r in runs)
+            else:      # MLAE: guess a_F from the classical warm start (m0 / N0)
+                aF0 = m0 / N0
+                rF = _ae_to_halfwidth(make_oracle(inst.feasible, oracle_kind),
+                                      min(0.5, rel_F or eps) * aF0, aF0, rng, alpha, ae, n_shots, mlae_shots)
+                aF_q = rF.oracle_queries
+        aF = rF.estimate
+        if aF <= 0:
+            return QAEResult(float("nan"), (float("nan"),) * 2, N0 + aF_q, dict(failed="a_F=0"))
+    q_total = N0 + aF_q
+    x = np.sort(sf[rng.integers(len(sf), size=int(m0))])
+    lo, hi = inst.score_range()
+    pad = 1e-9 + 1e-6 * (hi - lo)
+    xk = np.concatenate([[min(lo - pad, x[0] - pad)], x, [max(hi + pad, x[-1] + pad)]])
+    pk = np.concatenate([[0.0], (np.arange(len(x)) + 0.5) / len(x), [1.0]])
+    F0 = lambda s: float(np.interp(s, xk, pk))
+    QF0 = lambda p: float(np.interp(min(max(p, 0.0), 1.0), pk, xk))
+    p_t, gap, steps = q, 1.0 / math.sqrt(m0), []
+    ts, ds = [], []                       # measured offsets delta_j = r_j - t_j at empirical ranks t_j
+
+    def solve_t():
+        """root of g(t) = t + delta(t) - q on [0, 1], delta = piecewise-linear through the
+        measured offsets (constant beyond the end points); bisection."""
+        if not ts:
+            return q
+        o = np.argsort(ts)
+        tt, dd = np.asarray(ts)[o], np.asarray(ds)[o]
+        g = lambda t: t + float(np.interp(t, tt, dd)) - q
+        a_, b_ = 0.0, 1.0
+        if g(a_) >= 0:
+            return a_
+        if g(b_) <= 0:
+            return b_
+        for _ in range(60):
+            m_ = 0.5 * (a_ + b_)
+            if g(m_) < 0:
+                a_ = m_
+            else:
+                b_ = m_
+        return 0.5 * (a_ + b_)
+
+    for _ in range(max_iter):
+        s = QF0(p_t)
+        h = max(eps, shrink * gap)
+        eps_a = h * aF
+        a_g = max(min(0.5, aF * (q + gap)), eps_a / 2)
+        r = _ae_to_halfwidth(make_oracle(inst.mask_below(s), oracle_kind), eps_a, a_g, rng, alpha, ae,
+                             n_shots, mlae_shots)
+        q_total += r.oracle_queries
+        rank = min(r.estimate / aF, 1.0)
+        t_s = F0(s)
+        ts.append(t_s); ds.append(rank - t_s)
+        steps.append((s, rank, h, r.oracle_queries))
+        p_t = solve_t()
+        gap = abs(q - rank) + 0.5 * h
+        if h <= eps:
+            break
+    est = QF0(p_t)
+    ex = inst.quantile(q)
+    rk = inst.percentile(est, "strict")
+    return QAEResult(est, (QF0(p_t - eps), QF0(p_t + eps)), q_total,
+                     dict(exact=ex, rank_error=abs(rk - q), rank=rk, a_F_est=aF, steps=steps,
+                          method="hybrid", cardinality_only=cardinality_only, classical_queries=N0,
+                          aF_queries=aF_q, m0=int(m0), n_iter=len(steps)))
+
+
 def classical_quantile(inst: ExactInstance, q: float, N: int, rng: np.random.Generator) -> float:
     """N proposals (uniform random k-subsets of the allowed assets), keep feasible, empirical
     lower q-quantile of S. NaN if none feasible."""
@@ -529,21 +651,37 @@ class QAEAttribution:
 def qae_attribute(u: Universe, cs: ConstraintSet, fund, method: str = "iqae",
                   eps_pct: float = 0.02, eps_med: float = 0.02, alpha: float = 0.05,
                   n_bisect: int = 14, K: int = 8, shots: int = 50,
-                  rng: np.random.Generator | None = None, oracle_kind: str = "auto") -> QAEAttribution:
+                  rng: np.random.Generator | None = None, oracle_kind: str = "auto",
+                  median_method: str = "hybrid", m0: int = 10) -> QAEAttribution:
     """Percentile, null/benchmark median, constraint and manager effects by AE, with the exact
     values and the classical i.i.d. rejection estimates: one shared sample set (percentile + null
     median) of max(quantum percentile, quantum null-median) proposals, plus a cardinality-only
-    set for the benchmark median. Total-return, equal-weight, buy-and-hold (rebalance=False) statistic only."""
+    set for the benchmark median. Total-return, equal-weight, buy-and-hold (rebalance=False) statistic only.
+
+    ``median_method``: "hybrid" (default; ``qae_quantile_hybrid``: ``m0`` classical feasible samples
+    charged as proposals + one rank-correction AE chain; ``eps_med`` is the rank CI half-width of the
+    last AE; the null median reuses the percentile's a_F run, charged once) or "bisect" (old
+    ``qae_quantile`` sequential-test bisection, ``n_bisect`` steps)."""
     rng = rng or np.random.default_rng(0)
     inst = ExactInstance.build(u, cs)
     inst_b = ExactInstance.build(u, cs, cardinality_only=True)
     s = _fund_score(fund, u, inst.g1)
     p = qae_percentile(u, cs, s, method, eps_pct, alpha, K, shots, rng=rng, inst=inst,
                        oracle_kind=oracle_kind)
-    nm = qae_quantile(u, cs, 0.5, method, eps_med, alpha, n_bisect, K, shots, rng, False, inst,
-                      oracle_kind)
-    bm = qae_quantile(u, cs, 0.5, method, eps_med, alpha, n_bisect, K, shots, rng, True, inst_b,
-                      oracle_kind)
+    if median_method == "hybrid":
+        ae = "iqae" if method == "iqae" else "mlae"
+        aF_run = p.details.get("a_F") if np.isfinite(p.estimate) else None
+        nm = qae_quantile_hybrid(u, cs, 0.5, eps_med, m0, alpha, rng=rng, inst=inst,
+                                 oracle_kind=oracle_kind, ae=ae, aF_run=aF_run)
+        bm = qae_quantile_hybrid(u, cs, 0.5, eps_med, m0, alpha, rng=rng, cardinality_only=True,
+                                 inst=inst_b, oracle_kind=oracle_kind, ae=ae)
+    elif median_method == "bisect":
+        nm = qae_quantile(u, cs, 0.5, method, eps_med, alpha, n_bisect, K, shots, rng, False, inst,
+                          oracle_kind)
+        bm = qae_quantile(u, cs, 0.5, method, eps_med, alpha, n_bisect, K, shots, rng, True, inst_b,
+                          oracle_kind)
+    else:
+        raise ValueError(median_method)
     ce, me = nm.estimate - bm.estimate, s - nm.estimate
     ex_nm, ex_bm = inst.quantile(0.5), inst_b.quantile(0.5)
     exact = dict(percentile=100 * inst.percentile(s, "strict"),

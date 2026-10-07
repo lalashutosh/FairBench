@@ -14,7 +14,7 @@ from fairbench.qae.attribution_qae import (ExactInstance, RankTable, SwapChainBa
                                            classical_percentile, exact_masks, exhaustive_cost,
                                            iid_shared_sample, linear_return_scores,
                                            portfolio_score, qae_attribute, qae_percentile,
-                                           qae_quantile, swap_connectivity)
+                                           qae_quantile, qae_quantile_hybrid, swap_connectivity)
 
 
 @pytest.fixture(scope="module")
@@ -164,3 +164,36 @@ def test_swap_mcmc_converges_and_connectivity(case):
     if conn["n_components"] == 1:
         assert np.median(o["pct_err"][:, -1]) < 0.05 and np.median(o["med_err"][:, -1]) < 0.05
     assert exhaustive_cost(inst) == inst.C
+
+
+def test_hybrid_quantile_accuracy_and_accounting(case):
+    """Hybrid null/benchmark median (m0 classical samples + rank-correction AE): rank error small
+    over 12 seeds, queries = classical N0 + a_F AE + step AEs, benchmark has no a_F run."""
+    u, cs, fund, inst = case
+    rs = [qae_quantile_hybrid(u, cs, 0.5, 0.02, 10, rng=np.random.default_rng(70 + i), inst=inst,
+                              oracle_kind="ideal") for i in range(12)]
+    errs = [r.details["rank_error"] for r in rs]
+    assert np.median(errs) <= 0.015 and max(errs) <= 0.12   # point estimate: no bracket guarantee, ~5% tail
+    for r in rs:
+        d = r.details
+        assert d["classical_queries"] >= 10 and d["aF_queries"] > 0
+        assert r.oracle_queries == d["classical_queries"] + d["aF_queries"] + sum(st[3] for st in d["steps"])
+    ib = ExactInstance.build(u, cs, cardinality_only=True)
+    b = qae_quantile_hybrid(u, cs, 0.5, 0.02, 10, rng=np.random.default_rng(3), inst=ib, oracle_kind="ideal")
+    assert b.details["cardinality_only"] and b.details["aF_queries"] == 0 and b.details["classical_queries"] == 10
+    assert b.details["rank_error"] <= 0.06
+
+
+def test_qae_attribute_median_method_switch(case):
+    u, cs, fund, inst = case
+    h = qae_attribute(u, cs, fund, eps_pct=0.03, eps_med=0.03, rng=np.random.default_rng(11))
+    assert h.details["null_median"].details["method"] == "hybrid"          # default
+    assert h.details["percentile"].details["a_F"] is not None
+    q = h.queries
+    assert q["total"] == q["percentile"] + q["null_median"] + q["benchmark_median"]
+    assert abs(h.constraint_effect - h.exact["constraint_effect"]) < 0.03
+    b = qae_attribute(u, cs, fund, eps_pct=0.03, eps_med=0.03, rng=np.random.default_rng(11),
+                      median_method="bisect")
+    assert b.details["null_median"].details["method"] == "iqae"
+    with pytest.raises(ValueError):
+        qae_attribute(u, cs, fund, median_method="nope")
