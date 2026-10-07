@@ -4,10 +4,11 @@ _Last updated 2026-10-07 (end of the P2 session). Repo: `https://github.com/lala
 
 ## Start here (next session)
 
-**State of the repo.** The P2 work (attribution app, demo, this handoff) is on branch **`p2-attribution`**, pushed to GitHub, one commit ahead of `main`. It is not merged into `main` yet; merge it (fast-forward) before starting new work, or keep working on the branch.
+**State of the repo.** The P2 work (attribution app, demo, this handoff) is merged into `main` (PR #1). The README was added on branch `add-readme`; if that branch is still unmerged on GitHub, merge it first. Run `git pull` on `main` before starting.
 
 **What the last session did (2026-10-07).**
 - Built `fairbench/apps/attribution.py`, `tests/test_attribution.py` (17 tests), `scripts/demo_attribution.py`; added returns loading and synthetic returns to `fairbench/data.py`. 255 tests green.
+- Added `README.md` (what the project is, honest status, quick start, usage on your own data).
 - Ran the demo and saved `results/attribution_demo.{png,json}` and `results/attribution_samplers.csv`.
 - Drafted the pitch deck (11 slides with speaker notes): https://claude.ai/artifact/Do4km8NeU9qw4oZvxEniJK. It lives only in that artifact, not in the repo, and is private until shared from its Share menu. Its layout has **not** been checked visually.
 
@@ -26,7 +27,7 @@ _Last updated 2026-10-07 (end of the P2 session). Repo: `https://github.com/lala
 - If the demo is re-run with other settings, the numbers on deck slides 4, 5 and 9 and the plot on slide 4 must be updated by hand.
 - Deck slides in order: cover, problem, method, result, hard, sampler, routes, breakeven, backend, today, next. Slides 4 and 8 use `results/attribution_demo.png` and `results/aa_breakeven.png`.
 
-**Working agreements.** Commit and push only when asked. Keep every pitch claim to the review-safe wording below. Update this file at the end of each session.
+**Working agreements.** Commit and push only when asked; push to a branch and merge through a pull request. Keep every pitch claim to the review-safe wording below. Update this file at the end of each session.
 
 ---
 
@@ -129,6 +130,7 @@ scripts/
   aa_estimate.py    AA wall-clock vs classical, break-even plot
 results/            CSV/PNG/JSON outputs of all scripts (plots ready for slides: attribution_demo.png,
                     ablation.png, mps_sweep.png, q2_gap.png, aa_pf_scaling.png, aa_breakeven.png)
+README.md           public-facing overview, quick start, usage example
 BUILD_PLAN.md       full execution log, per-wave results, review findings, pitch-safe wording
 ```
 
