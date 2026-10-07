@@ -1,0 +1,158 @@
+# FairBench P0 build plan
+
+Source of truth for interfaces: `fairbench_handoff.md`. This file = execution plan only.
+Main thread orchestrates; all code written by subagents. File ownership per wave is disjoint, so parallel agents never touch the same file.
+
+## Environment
+- `uv venv --python 3.11 fairbench/.venv`; `uv pip install -e "fairbench[dev]"`.
+- Run everything via `fairbench/.venv/bin/python` / `.venv/bin/pytest`.
+- `git init` in `fairbench/` so later waves + review can diff.
+
+## Waves
+
+| Wave | Agent | Model | Owns (files) | Done when |
+|---|---|---|---|---|
+| W0 | scaffold | sonnet | `pyproject.toml`, all `__init__.py`, `data.py`, `constraints.py`, `tests/test_constraints.py`, P1/P2 stubs (`training.py`, `postprocess.py`, `apps/*.py`), stub files for W1 modules (signatures + `NotImplementedError`) | venv works, `pytest tests/test_constraints.py` green, `import fairbench.quantum` ok |
+| W1a | quantum-core | **opus** | `quantum/dicke.py`, `quantum/ansatz.py`, `tests/test_dicke.py`, `tests/test_ansatz.py` | Dicke(6,3) exact uniform over 20 states; XY mixer weight-preserving (ring + complete); `build_ansatz` param vectors γ, β |
+| W1b | hamiltonian | **opus** | `quantum/hamiltonian.py`, `tests/test_hamiltonian.py` | penalty op diag == brute-force penalty on all 2^n for small n; zero on feasible weight-k states (modulo constant); objective QUBO diag matches `-mu·x + λ xᵀΣx` |
+| W1c | backends | sonnet | `backends.py`, `tests/test_backends.py` | bit-order round trip test; `aer_statevector` + `aer_mps` (with `bond_dim` kw); `ibm`/`vtt` raise `NotImplementedError`; returns `(shots,n)` uint8 |
+| W1d | baselines+metrics | sonnet | `baselines.py`, `metrics.py`, `tests/test_baselines.py` | enumerate == brute force; rejection/MCMC outputs feasible; MCMC records move count; metrics unit-tested on toy sets |
+| W2 | integration | sonnet | `scripts/p0_demo.py` | full `pytest` green; demo prints table (acceptance, TV, coverage, cost/feasible) for Dicke p=0, rejection, MCMC |
+| W3 | review | **opus** (read-only) | none | findings list: correctness of Dicke construction, bit order, penalty math, TV/coverage defs, seeding, honesty caveat (Dicke+filter ≡ rejection) |
+| W4 | fix | sonnet / opus by severity | files named in findings | re-run pytest + demo; report table |
+
+Model choice rule: opus where math/quantum correctness is subtle (Dicke split-and-cyclic-shift, XY mixer, Pauli penalty expansion, review). Sonnet for mechanical/well-specified code.
+
+## Shared contracts (all agents)
+- Selection `x`: uint8 vector length n, column i = asset i. Every sampler returns `(shots, n)` uint8.
+- Every random fn takes `seed: int | None`; tests fix seeds; no network/hardware in tests.
+- Python 3.11, type hints, NumPy-vectorised checks, small pure functions.
+- Constraint logic lives only in `constraints.py`. Cardinality never penalised in Hamiltonian.
+- Do not edit files owned by another agent. Need change outside ownership → report it, don't do it.
+
+## Sanity expectation for demo
+Dicke p=0 + filter and rejection sampling must show ~same acceptance and TV (same distribution). If not → bug. State this in demo output.
+
+## After P0 (not this build)
+P1: `training.py` (COBYLA/SPSA, objective = callable on samples), `postprocess.py` (filter, repair w/ flag, weights). Ablation + MPS bond-dim sweep. P2: apps.
+
+---
+# P1 plan (started 2026-10-05)
+
+P0 done: commit a42bd46, 115 tests green.
+
+| Wave | Agent | Model | Owns | Done when |
+|---|---|---|---|---|
+| P1-A1 | training | **opus** | `training.py`, `objectives.py`, `tests/test_training.py` | train() works with COBYLA/SPSA; objectives = callables on samples (CVaR, uniformity); exact-probability fast path; trained n=12 ansatz beats Dicke acceptance with TV reported |
+| P1-A2 | postprocess | sonnet | `postprocess.py`, `tests/test_postprocess.py` | filter_feasible, repair (flagged), assign_weights |
+| P1-A3 | islands | sonnet | `instances.py`, `tests/test_instances.py`, `scripts/p0_demo.py` (thin=T fix only) | seeded instance with ≥2 swap components; MCMC coverage shown < 1 |
+| P1-A4 | mps sweep | sonnet | `scripts/p1_mps_sweep.py` | bond-dim sweep: TV vs exact + wall time, saves CSV + PNG |
+| P1-B | ablation | sonnet | `scripts/p1_ablation.py` | same post-processing, sampler swapped: random bitstrings, product-state circuit, Dicke p=0, trained ansatz, rejection, MCMC — on default + island instance; commit |
+| P1-C | review | **opus** read-only | — | findings list |
+| P1-D | fixes | by severity | per findings | green + commit |
+
+P1 done: commit 2e7e2f4, 144 tests green. Open nits: ablation runtime 7m20 (repair mode dominates; add --no-repair), mps_sweep.png has stale "chi_needed" axis label, `wall_at_need` column name.
+
+---
+# Q plan — quantum-enhanced MCMC (append to BUILD_PLAN.md)
+
+Base: P1 commit 2e7e2f4. Goal: test whether a quantum proposal un-traps MCMC on the island instance, measured by **exact spectral gap**, against fair classical chains. Decision gate at the end decides how it enters the pitch.
+
+## Why this wave
+- P1 showed swap-MCMC trapped on islands (coverage 0.32, TV−floor 0.417), while rejection/Dicke are unbiased but cost about 80 proposals per valid portfolio (exact valid fraction 1.26%).
+- QeMCMC sits between the two: a proposal that is non-local (escapes islands) but concentrated near low-penalty states (higher acceptance than uniform proposals).
+- Rejection sampling is itself an MH chain with an independent uniform proposal, and its gap equals the valid fraction (≈0.0126). **QeMCMC must beat both swap-MCMC and this independent chain.**
+
+## Physics contract (all Q agents)
+- Proposal: from feasible x (weight k), evolve |x> under H = −Σ_edges (XX+YY)/2 + α·H_pen + optional h·Σ Z_i fields, for time t, then measure → y.
+- H is real and conserves Hamming weight → work in the **weight-k subspace** (dimension C(n,k)), with the basis index map shared with `enumerate_feasible`.
+- Exact path: Q = |expm(−iHt)|² in the subspace (no Trotter). Q must be symmetric: assert `allclose(Q, Q.T)`.
+- Circuit path: Trotterised, in **palindromic** order (symmetric product formula) so that Uᵀ = U. One shot per chain step via `backends.sample`.
+- Target: uniform over the feasible set. MH acceptance for a symmetric Q is simply: accept iff y is feasible.
+- Approximate simulators (MPS with small χ) and hardware noise can break symmetry and bias the stationary distribution. Always measure ‖Q−Qᵀ‖ and the stationary-distribution TV when Q is not exact.
+
+## Waves
+
+| Wave | Agent | Model | Owns | Done when |
+|---|---|---|---|---|
+| Q-0 | nits | sonnet | `scripts/p1_ablation.py` (`--no-repair`), `scripts/p1_mps_sweep.py` (axis label, `wall_at_need` rename) | ablation < 5 min with `--no-repair`; plot and CSV labels fixed |
+| Q-A1 | proposal | **opus** | `quantum/proposal.py`, `tests/test_proposal.py` | `subspace_basis(n,k)`, `subspace_hamiltonian(n,k,topology,alpha,pen_op,h)`, `exact_proposal_matrix(t, …)`, `circuit_proposal(x, t, n_trotter, backend, seed)`; tests: Q symmetric, rows sum to 1, weight preserved, Trotter Q → exact Q as n_trotter grows (n=6), circuit 1-shot samples match exact Q rows (χ² test) |
+| Q-A2 | chains | sonnet | `chains.py`, `tests/test_chains.py`, `instances.py` (add `island_family(n, k, seed)` only) | generic MH `run_chain(proposal, x0, steps, seed)` with proposals: swap, multi-swap(m random swaps), independent-uniform, quantum-exact, quantum-circuit; `transition_matrix(Q, feasible_mask)` (rejected mass on the diagonal); `spectral_gap(P)` = 1 − max(\|λ₂\|, \|λ_min\|); `mixing_time_tv(P, eps)`; tests: stationary dist uniform; independent-chain gap == valid fraction (analytic); swap-chain gap == 0 when islands are disconnected |
+| Q-B | gap sweep | sonnet | `scripts/q_gap_sweep.py` | on P0 + island: grid over t × α (× h); best QeMCMC gap vs swap, best multi-swap m, independent; size trend on `island_family` n = 8, 10, 12, 14, 16 (exact); CSV + PNG; also a fixed-budget sampled run reporting the P1 table columns (coverage, TV−floor, cost per valid sample) |
+| Q-C | mps proposals | sonnet | `scripts/q_mps_proposal.py` | proposals via `aer_mps` at χ ∈ {2,4,8,16,32}: TV of Q rows vs exact, ‖Q−Qᵀ‖, resulting gap, stationary-distribution TV, wall time; CSV + PNG |
+| Q-D | review | **opus** read-only | — | findings: subspace/basis correctness, symmetry, gap definition, fairness of classical baselines (multi-swap tuned as hard as QeMCMC), whether t/α tuning on one instance leaks into the reported result (tune on seed A, report on seeds B…), and wording of claims |
+| Q-E | fixes | by severity | per findings | green + commit |
+| Q-F (optional) | hardware | sonnet | `scripts/q_hardware.py` | a few short chains on IBM in Session mode on the island instance: accepted fraction, proposal weight-violation rate, coverage after N steps; framed as feasibility only |
+
+## Decision gate (after Q-E)
+- **Best QeMCMC gap > max(multi-swap gap, independent gap), and the ratio grows with n:** QeMCMC becomes the headline technical result. Pitch line: "exact spectral gap, small instances, trend not proof" (Orfi et al. rule out speedups only for unstructured problems).
+- **Gain only vs swap-MCMC:** report it as "escapes islands like rejection sampling, and needs no global proposal". Secondary result.
+- **No gain:** one honest slide. Pitch rests on amplitude amplification plus simulation cost, as after P1.
+- **MPS (Q-C) keeps the gain at small χ:** add a "quantum-inspired sampler runnable today on LUMI" line (Christmann et al. 2025).
+
+## After Q
+1. Amplitude-amplification resource estimate (logical qubits, T-count for the island-style oracle at n ≈ 100–200).
+2. P2 attribution app (blocked on real fund data and validation answers).
+3. Pitch deck from review-safe claims.
+# Q results (Q-E2, scripts/q_gap_sweep2.py, results/q2_*; full sweep 317 s)
+Frozen on island_family(12) seeds 0-4 (plateau rule: cheapest config within 2% of max median gap): QeMCMC-indicator complete a=32 t=5.9; QeMCMC-violation complete a=32 t=8.9; QeMCMC-surrogate ring a=0.5 t=3.9; CTRW-tilted-indicator complete beta=4 t=8.9; CTRW-tilted-violation complete beta=32 t=20; CTRW-tilted-surrogate complete beta=2 t=0.77; CTRW untilted complete t=0.51; multi-swap m*=9. Penalty-diagonal AUC (feasible vs infeasible): indicator 1.0, violation 1.0, surrogate QUBO ~0.77 (0.67-0.90).
+Median [IQR] per-step gap ratio, held-out (n=12 seeds 5-9; n=14, 16 seeds 0-9):
+| n | QeMCMC-ind / CTRW-tilted-ind | QeMCMC-ind / best blind | QeMCMC-viol / CTRW-viol | QeMCMC-surr / CTRW-surr |
+| 12 | 0.42 [0.42-0.68] | 8.9 | 0.14 | 0.88 |
+| 14 | 0.69 [0.64-0.73] | 15.1 | 0.16 | 0.30 |
+| 16 | 0.84 [0.82-0.92] | 19.4 | 0.15 | 0.40 |
+Per-cost (cost-tuned params, indicator oracle assumed n gates): QeMCMC is far worse than classical for all diags (ratios 1e-3..1e-2; the indicator ratio vs CTRW is erratic, IQR spans 1e-3..1e2, because the cost-tuned CTRW config is unstable). Per-cost vs best blind <0.04.
+Gate verdict: NO QUANTUM GAIN. QeMCMC never beats tilted CTRW with the same diagonal (per step median <1 at all n; per cost <<1). The only advantage is over penalty-blind chains (indicator/violation, 9-19x per step), and a classical tilted CTRW with the same oracle diagonal gets it better. Surrogate QUBO diagonal gives no gain over blind (ratio <1.5). Caveats: exact gaps, n<=16, Trotter-cost fit extrapolated from n=12 surrogate, oracle cost assumed.
+Pitch-safe wording: "We tested a quantum-enhanced MCMC proposal by exact spectral gap against fair classical baselines, including a classical walk given the same feasibility information. It escapes swap-chain islands only when given an exact feasibility oracle, and a classical walk with that oracle does at least as well; we found no evidence of quantum advantage at n<=16 (small instances, a trend not a proof)."
+
+---
+# AA plan — amplitude-amplification resource estimate (started 2026-10-06)
+
+Base: commit 7faa59b. Goal: concrete fault-tolerant cost of exact-uniform feasible sampling via amplitude amplification (AA) over the Dicke state, at n ≈ 50–200, plus an honest wall-clock break-even vs classical rejection.
+
+Key facts to keep straight:
+- AA from Dicke with a feasibility phase oracle yields the uniform superposition over F ⇒ **exactly uniform** samples (no bias, unlike penalty/trained layers). Iterations ≈ (π/4)/√P_F; unknown P_F ⇒ exponential search or fixed-point AA (Yoder–Low–Chuang).
+- Grover operator = Oracle · (Dicke† · reflect-about-0 · Dicke). Dicke prep cost includes rotation synthesis (T gates).
+- Oracle must be EXACT feasibility (integer-quantised ESG/carbon); quantisation mismatch must be measured.
+- Quadratic speedups are often eaten by FT overheads (Babbush et al. 2021). Report break-even P_F in wall-clock, with stated assumptions (logical cycle time, T-factory throughput, classical check time).
+
+| Wave | Agent | Model | Owns | Done when |
+|---|---|---|---|---|
+| AA-1 | oracle | **opus** | `fairbench/ft/__init__.py`, `ft/oracle.py`, `ft/revsim.py`, `tests/test_oracle.py` | reversible feasibility oracle (Cardinality assumed by Dicke; SectorCap popcount+compare; Exclusion; MinESG/CarbonCap weighted integer sums + comparator); classical bit-level simulator; oracle marks exactly F on P0, island, island_family(12..16) seeds; quantisation mismatch reported; gate counts (Toffoli, CNOT, qubits) per component |
+| AA-P | P_F scaling | sonnet | `instances.py` (add `scaled_family(n,k,seed)` only), `scripts/aa_pf_scaling.py`, `results/aa_pf_*` | MC estimate (with CI) of P_F for scaled family n=16..200; upper bound when undetected; plot |
+| AA-2 | resources | **opus** | `ft/resources.py`, `tests/test_resources.py` | analytic logical counts (qubits, Toffoli/T, T-depth) for oracle + Dicke (+rotation synthesis) + reflection, cross-checked vs AA-1 circuit counts at small n; AA iteration counts (standard, exponential search, fixed-point); verify amplification in exact subspace sim at n≤16 |
+| AA-3 | report script | sonnet | `scripts/aa_estimate.py`, `results/aa_*` | table n=50..200: P_F, iterations, logical qubits, T-count per sample, wall-clock per sample under stated FT assumptions vs classical rejection; break-even P_F curve; PNG; optional `qsharp` resource-estimator cross-check |
+| AA-4 | review | **opus** read-only (time budget 30 min, thread cap) | — | findings + pitch-safe claims |
+| AA-5 | fixes | by severity | per findings | green + commit |
+
+---
+# AA-3 results — after AA-4 review + AA-5 fixes (scripts/aa_estimate.py, results/aa_estimate.csv, aa_breakeven.{csv,png}, aa_assumptions.json; 36 s, parent RSS 0.9 GB, pool capped at 4)
+
+OOM root cause (killed the 2026-10-06 13:01 session): `ft/resources.bbht_schedule` allocated `np.arange(M)` per round (M ~ 1e8 at P_F ≲ 1e-10 → 8–10 GB). Now BBHT Lemma 2 closed form `½ − sin(4Mθ)/(4M sin 2θ)`, `E[j] = (M−1)/2`; regression test added. Second OOM risk (AA-4 #1): `measure_classical` ran an uncapped 16-process pool each rebuilding `scaled_family` (~12 GB) → now instance built once, pool = 4, loop-only timing.
+
+AA-5 fixes applied (AA-4 finding #):
+- #2 oracle exactness: n > 16 now uses **superset thresholds** `T = ceil(t0 − k/2)` (rounding error ≤ ½ per asset ⇒ F ⊆ F_q provably). Float post-check of each measured sample ⇒ **exactly uniform over F**. FN = 0 at n = 50–200; FP cost |F|/|F_q| = 0.986–0.997, folded into all per-sample costs. Quantisation now reports FP/FN separately vs |F|.
+- #4/#5 classical baseline: two measured baselines — naive (dense argsort + ConstraintSet) and lean (argpartition draw + O(k) index check, asserted equal to reference). Lean is 1.5–3× faster. Measured 4-process parallel efficiency 0.86–0.91 (lean). 64 cores is labelled *assumed ideal scaling*. n=150 now measured, not interpolated.
+- #6 quantum sensitivity: `qbest` constants (RUS/mixed synthesis rs_const 1.15, t_per_toffoli 2 via measurement uncompute); log-depth Dicke not modelled.
+- #7 `t_depth_per_toffoli` default 1 → 2 (consistent with 4-T Gidney AND).
+- #8–12 caveats written into aa_assumptions.json notes (serial oracle depth bound; algorithmic qubits only; fixed-point assumes known P_F; seed-0 counts with median P_F).
+- #13–15 tests: superset FN=0 at n=50,100 (incl. 50k held-out); gate-level oracle == quantised rule at n=50 (2k inputs, ancillas clean); resource totals by hand; BBHT closed form + huge-M regression. 238 tests green.
+
+Per-sample cost, scaled_family seed-median P_F, known schedule, default constants:
+
+| n | P_F | iters | algorithmic logical qubits | T / sample | quantum s/sample (opt / mod / factory) | classical lean 1 core s/sample | quantum ÷ lean (optimistic) |
+|---|---|---|---|---|---|---|---|
+| 50 | 0.176 | 1 | 112 | 1.2e5 | 0.071 / 0.71 / 0.12 | 5.5e-6 | 1.3e4 |
+| 100 | 0.073 | 2 | 197 | 8.3e5 | 0.27 / 2.7 / 0.83 | 2.7e-5 | 1.0e4 |
+| 150 | 0.047 | 3 | 297 | 2.6e6 | 0.60 / 6.0 / 2.6 | 7.5e-5 | 8.0e3 |
+| 200 | 0.032 | 4 | 397 | 6.1e6 | 1.1 / 11 / 6.1 | 1.2e-4 | 8.7e3 |
+
+BBHT (unknown P_F) ~1.3× known; fixed-point ~3–4× (assuming P_F known for p_lower). Dicke prep ×2 dominates iterate T (~85–92%). Oracle ~120–130·n Toffoli at 11 bits.
+
+Break-even P_F* (known schedule, n = 100 / 200):
+- vs lean 1 core: optimistic 2.3e-10 / 2.2e-10; moderate 2.0e-12 / 1.9e-12. Best-known quantum constants: optimistic 1.0e-9 / 9.4e-10.
+- vs naive 1 core: optimistic 1.1e-9 / 1.9e-9. Analytic (c/((π/4)C_q))² agrees within 1.4×.
+- vs 64 lean cores (assumed ideal): < 1e-12 in every case.
+- P* ∝ c_classical², so a compiled O(k) classical check (~10–30× faster than numpy) would lower P* by a further 10²–10³.
+
+Pitch-safe claim (AA-4 wording, updated): *AA over the Dicke state, with integer-quantised superset thresholds and a classical float post-check, gives samples exactly uniform over the feasible set; the oracle is verified gate-level against exact enumeration for n ≤ 16 and against the quantised rule at n = 50, with zero false negatives by construction. It costs ~120–130·n Toffoli for the oracle, but Dicke-state preparation dominates the T-count (~85–90%), using ~200–400 algorithmic logical qubits at n = 100–200 (excluding factories/routing). Under stated FT assumptions (1–10 µs per T-layer) it beats single-core numpy rejection sampling only if the feasible fraction is below ~1e-9 to 1e-12; that bound is sensitive to constants on both sides, and an optimised classical check pushes it lower. In our synthetic constraint family at n ≤ 200 the feasible fraction is 1e-2 to 2e-1, so there is no wall-clock advantage. Larger universes, where the feasible fraction shrinks, were not evaluated.*
