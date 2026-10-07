@@ -73,12 +73,13 @@ def run(n=16, k=5, seed=0, years=3.0, premium=0.08, rank=0.70, eps=0.01, method=
 
 
 def scaling_ref(pf, tol="0.01"):
-    """whole-attribution required-query numbers (multi-rep) from results/qae_scaling.json, closest P_F."""
+    """whole-attribution required-query numbers (multi-rep, median error) from
+    results/qae_hybrid.json (hybrid median, the qae_attribute default), closest P_F."""
     try:
-        cases = json.loads((RES / "qae_scaling.json").read_text())["d"]["cases"]
+        cases = json.loads((RES / "qae_hybrid.json").read_text())["cases"]
         c = min(cases, key=lambda c: abs(np.log(c["P_F"] / pf)))
-        t = c["tol"][tol]
-        return c["P_F"], t["rejection"], t["quantum"]
+        w = c["whole"]
+        return c["P_F"], w["rejection"], w["quantum_hybrid"], w.get("mcmc")
     except Exception:
         return None
 
@@ -107,16 +108,17 @@ def show(out, method):
           f"with errors above -- compare rows, single run")
     ref = scaling_ref(d["P_F"])
     if ref:
-        print(f"  single run; multi-rep required-query comparison (tol 0.01, closest P_F={ref[0]:.4f}) in "
-              f"results/qae_scaling.json, whole attribution: rejection {ref[1]:,.0f} vs quantum {ref[2]:,.0f} "
-              f"queries ({ref[1] / ref[2]:.2f}x)")
+        mc = f", swap-MCMC {ref[3]:,.0f}" if ref[3] else ""
+        print(f"  single run; multi-rep required queries for the whole attribution at tol 0.01 (median error, "
+              f"closest P_F={ref[0]:.4f}, results/qae_hybrid.json): rejection {ref[1]:,.0f}{mc} vs "
+              f"quantum (hybrid median) {ref[2]:,.0f} ({ref[1] / ref[2]:.1f}x vs rejection)")
     else:
-        print("  single run; see results/qae_scaling.json for the multi-rep required-query comparison")
+        print("  single run; see results/qae_hybrid.json for the multi-rep required-query comparison")
     po = d["percentile_only"]
     print(f"  percentile alone: quantum {po['quantum_queries']} vs classical {po['classical_queries']} "
           f"queries ({po['classical_queries'] / po['quantum_queries']:.2f}x)")
-    print("  cause: null-median bisection runs to a guaranteed per-step precision (~14 AE runs) "
-          "-- the weak spot of the quantum pipeline\n")
+    print("  median: classical warm start (~10 feasible samples, charged) + amplitude-estimation "
+          "refinement; point estimate, 90%-tail errors 3-10x the median\n")
 
 
 def save(out, path, t0):
