@@ -284,28 +284,50 @@ Query conventions: classical query = 1 proposal + feasibility/statistic evaluati
 Safety: every heavy run `ulimit -v 4000000`, BLAS threads ≤ 2, `timeout`; no uncapped multiprocessing.
 
 ---
-# QA results (branch `quantum-qae`, commits b532dcd..27eb518; all numbers from results/qae_*; synthetic data)
+# QA results (branch `quantum-qae`; all numbers from results/qae_* and results/demo_qae*; synthetic data; reviewed twice)
 
-**One line:** amplitude estimation (QAE) over the Dicke state gives the textbook quadratic *query* advantage on the attribution percentile, and it is the only method that stays robust on tight, fragmented mandates, but it is a fault-tolerant-era claim. Noisy hardware gives no advantage, and fault-tolerant wall-clock gives none at any precision an analyst needs.
+**One line:** in noiseless simulation, quantum amplitude estimation (QAE) needs quadratically fewer oracle queries for the attribution *percentile*. It does not depend on the feasible set being connected, which matters on fragmented tight mandates. It is a fault-tolerant-era result we can quantify today, not a speedup on current or near-term hardware.
 
-What was built: `fairbench/qae/` (IQAE, MLAE with LR CI, canonical AE, noisy model, charged-pilot amplitude-tolerance IQAE; percentile / quantile / whole-attribution estimators), `constraints.LinearThreshold` + oracle encodings for CountBound / AvgBound / LinearThreshold (the "return < fund" comparator, ~1.45× the feasibility oracle), quantise modes superset/subset/minmis. 660 tests green.
+Built: `fairbench/qae/` (IQAE with collapse guard; MLAE with likelihood-ratio CI; canonical AE; noisy oracle model; `iqae_amplitude_tol` with charged pilot; percentile / quantile / whole-attribution estimators; exact-counting DP `exact_count.py`; demo bridge). `constraints.LinearThreshold` plus oracle encodings for CountBound / AvgBound / LinearThreshold (the "return < fund" comparator, ~1.45× the feasibility oracle), and quantise modes superset/subset/minmis.
 
-Measured (noiseless simulation, exact amplitudes, query = one Grover iterate vs one classical proposal):
-1. **Precision scaling (QA-3):** percentile error ∝ queries^−0.91…−1.02 (IQAE/MLAE) vs ^−0.48…−0.50 (classical i.i.d. rejection), n=16 and n=24.
-2. **Rule tightness (QA-F1, percentile only, tol 0.01):** queries ∝ P_F^−0.41…−0.56 (quantum) vs P_F^−1.17 (rejection) vs P_F^−0.54 (swap-MCMC, when it works). Exhaustive enumeration beats all samplers at these small n (C = 7.5e4).
-3. **Whole attribution (percentile + null median + benchmark median, one shared classical sample set, tol 0.01):** loose rules (P_F ≥ 0.03) — rejection wins or ties (rejection/quantum 0.5–0.6×); tight rules (P_F ≤ 0.007) — quantum 1.75–4.9× fewer queries than rejection, ~0.8–1.8× vs MCMC. The medians gain little from QAE (bisection ×14).
-4. **Fragmentation:** at P_F ≤ 0.0023 the swap graph of F splits into 14–19 components; MCMC chains are trapped (q90 percentile error 0.26–0.44 at P_F 0.0023–0.0011). QAE has no connectivity requirement.
-5. **Example mandate (QA-F3, n=150, k=20, P_F 0.55%):** at ±1 pp, rejection/quantum 7–21× (encodable sub-mandate 7–26×), MCMC/quantum 2–5× (encodable 3–10×) (range = nominal-target vs matched q95 error; MCMC partly extrapolated in chain length). Full mandate has NO oracle (TrackingErrorCap quadratic, MinGroups); encodable sub-mandate (P_F 0.68%): oracle 2.6e4 Toffoli, 391 logical qubits.
-6. **NISQ (QA-4):** Grover iterate of the percentile oracle at n=16: ~1.7e4 CX (4.4e4 on heavy-hex), ~74 qubits. No crossover with classical at p2 ∈ 1e-2…1e-5; any advantage needs p2 ≲ 2e-6 (n=16), ≲ 1e-8 for 10×, tightening ~1/n². Aer density-matrix check at n=4: decay model is conservative (~2×); leakage out of the weight-k subspace is large.
-7. **Fault-tolerant wall-clock (QA-F3):** no break-even at any ε ≥ 1e-5 (measured range) in 96 configurations; at ε=0.01 quantum is ≥ 1e4× slower than single-core numpy. Superset-oracle quantisation bias floor on the percentile: 0.8e-3…4e-3 (n=50–200). Unmodelled classical threat: sector-grouped exact-counting DP.
+Measured. Unless stated otherwise: noiseless simulation, exact amplitudes, and a query is one Grover iterate (quantum) or one proposal (classical).
+1. **Precision (QA-3):** percentile error ∝ queries^−0.91…−1.02 (IQAE/MLAE) vs ^−0.48…−0.50 (classical i.i.d. rejection from the same uniform proposal), at n=16 and n=24.
+2. **Rule tightness, percentile only, tol 0.01 (QA-F1):**
+   - Queries ∝ P_F^−0.41…−0.56 (quantum) vs P_F^−1.17 (rejection) vs P_F^−0.54 (swap-MCMC on connected sets).
+   - **IQAE is the robust method.** Its 95th-percentile error reaches ±1 pp on all tight cases. MLAE's median looks better, but its error tail does not reach ±1 pp at P_F ≤ 0.0072.
+   - Exhaustive enumeration (C = 7.5e4) beats all samplers at the 95% level at these small n.
+3. **Whole attribution (percentile + null median + benchmark median), tol 0.01.** Classical uses one shared sample set.
+   - Loose rules (P_F ≥ 0.03): rejection needs fewer queries (rejection/quantum 0.48–0.62).
+   - Tight rules (P_F ≤ 0.007): quantum needs 1.75–4.9× fewer than rejection, and 0.8–1.8× vs MCMC (it loses at P_F 0.72%).
+   - The medians are the weak spot: bisection takes about 14 AE runs.
+4. **Fragmentation:** at P_F ≤ 0.0023 the swap graph of F splits into 14–19 components, and MCMC chains get trapped (90th-percentile percentile error 0.26–0.44). AE needs no connectivity.
+5. **Example mandate (QA-F3, n=150, k=20; percentile only, ±1 pp).**
+   - Full mandate (P_F 0.55%): about 7–21× fewer queries than rejection and 1.8–5× fewer than MCMC. This assumes a hypothetical oracle: TrackingErrorCap (quadratic) and MinGroups cannot be encoded.
+   - Encodable sub-mandate (P_F 0.68%): 7–26× vs rejection and 2.6–9.6× vs MCMC. Its oracle is 2.6e4 Toffoli and 391 logical qubits.
+   - Each range runs from the nominal-target cost to the matched-95%-error cost. The MCMC figures are partly extrapolated in chain length.
+   - The 8-bit oracle's quantisation bias on the mandate was not measured.
+6. **NISQ (QA-4).**
+   - One Grover iterate of the percentile oracle at n=16 needs about 1.7e4 CX (4.4e4 after heavy-hex routing) on 74 qubits.
+   - No crossover at p2 ≥ 1e-5.
+   - Any advantage needs two-qubit error rates of order 1e-6. The model gives 2.4e-6 at n=16 with an optimal, gamma-aware estimator. An Aer density-matrix check at n=4 suggests the model over-predicts decay by about 2×, which would loosen this to about 5e-6.
+   - The requirement tightens as n^−1.4…−1.9.
+7. **Fault-tolerant wall-clock (QA-F3).** At ε = 0.01 quantum is ≥ 8e3× slower than single-core numpy rejection (≥ 1.6e4× with default constants). There is no break-even down to ε ≈ 1e-4 (measured) or 1e-5 (extrapolated), in any of 96 configurations. The superset-oracle bias floor on the percentile is 0.08–0.4 pp (n=50–200).
+8. **Exact-counting DP (QA-7).** A dense sector DP over (count, group counts, binned weighted sums).
+   - **Guaranteed ±0.01:** extrapolated to need about 1e3 bins, roughly 1.5e12 cells at n=100 with 3 weighted rules.
+   - **Unguaranteed estimates:** reachable bins give 0.07–0.5 pp at n=100 in 13–100 s, which is competitive with the superset oracle's own bias. Errors are 3–9 pp at n=150–200.
+   - **Few weighted rules:** with ≤2 weighted rules the DP is cheap and a real competitor.
+   - **The encodable mandate** (4 weighted rules plus 10 overlapping country caps) needs ≥2.6e16 cells: intractable.
+   - **Wording:** *"exact counting is intractable once three or more weighted rules (including the fund-return rule) combine, or with many overlapping group caps; rules neither method can encode (min-groups, quadratic risk caps) need sampling."*
 
-Pitch-safe wording:
-> *"The attribution percentile is an amplitude. In noiseless simulation, quantum amplitude estimation over our constraint-preserving circuit reaches a given precision with quadratically fewer queries than classical sampling (error ∝ 1/queries vs 1/√queries), and the gap widens on tight mandates, where rule sets split the feasible portfolios into disconnected islands that trap classical MCMC. On the example mandate that is roughly 7–21× fewer queries than rejection sampling at ±1 percentile point. It is a fault-tolerant-era result: on today's noisy devices the circuit (~17k two-qubit gates per step at 16 assets) gives no advantage, and even fault-tolerant wall-clock time does not beat a laptop at analyst precision."*
+Demo: `scripts/demo_qae.py` (about 2 s) runs a loose and a tight instance. It prints errors vs exact and the multi-rep reference: rejection wins on loose rules, and quantum needs about 4× fewer queries on tight ones. Pitch figure: `results/qae_pitch_figure.png`.
 
-Must not say: "quantum speedup for attribution", "advantage grows as mandates tighten" without "vs rejection sampling / where MCMC is trapped", any ε* break-even number, "7×" as a point value. Must qualify: noiseless simulation, synthetic data, percentile is the statistic that benefits (medians little), full mandate oracle hypothetical, quantisation bias floor ~0.1–0.4 pp.
+**Pitch wording (final, reviewed):**
+> *"The attribution percentile is a ratio of two amplitudes. In noiseless simulation on synthetic data, quantum amplitude estimation over our constraint-preserving circuit reaches a given percentile precision with quadratically fewer oracle queries than classical sampling (error ∝ 1/queries vs 1/√queries). Against rejection sampling the gap widens as mandates tighten. On the tightest rule sets the feasible portfolios split into disconnected islands that trap swap-MCMC; amplitude estimation does not depend on that connectivity. On the example mandate, assuming an oracle for all of its rules, the percentile needs roughly 7–21× fewer queries than rejection sampling at ±1 percentile point. For the full attribution (percentile plus both medians) the gain is 2–5× over rejection, and only on tight rules. It is a fault-tolerant-era result: on today's noisy devices the circuit (~17k two-qubit gates per step at 16 assets) would need two-qubit error rates of order 1e-6 for any advantage, and even fault-tolerant wall-clock time does not beat a laptop at analyst precision."*
 
-8. **Exact-counting DP (QA-7, `qae/exact_count.py`, results/qae_dp*):** sector DP over (count, CountBound counts, binned weighted sums). A guaranteed ±0.01 bracket needs B≈1000 bins → ~1e12 cells at n=100 with 3 weighted rules; reachable B (12–24) gives unguaranteed point estimates within 0.5 pp at n=100 in ~100 s (rejection: 0.16 s for ±0.01). With ≤2 weighted rules the DP is cheap and a real classical competitor. Encodable mandate (4 weighted rules + 10 overlapping country caps): ≥2.6e16 cells even at B=4 — intractable. Wording: *"exact counting is unguaranteed or intractable at realistic precision once three or more weighted rules combine, and fails on mandates with overlapping group caps, average bounds, min-groups or risk caps."*
+Must not say:
+- "quantum speedup for attribution";
+- "advantage grows as mandates tighten" without "vs rejection sampling / where MCMC is trapped";
+- any ε* break-even number;
+- a single "N×" figure without its range and its percentile-only scope.
 
-Demo: `scripts/demo_qae.py` (2 s) — loose vs tight instance, errors vs exact, multi-rep reference. Pitch figure: `results/qae_pitch_figure.png`.
-
-Open: second review of the fixes not run; quantum-walk (Szegedy/Montanaro) speedup of MCMC not explored; bits=1 oracle bug fixed (ee0538e).
+Open: quantum-walk (Szegedy/Montanaro) speedup of MCMC not explored; hybrid classical-warm-start median (QA-10) in progress.

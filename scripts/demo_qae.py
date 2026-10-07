@@ -101,11 +101,10 @@ def show(out, method):
         ers = ["-"] * 3 if key == "exact" else [f"{er[0]:.2f}", f"{100 * er[1]:.2f}%", f"{100 * er[2]:.2f}%"]
         print(f"{name:<24}{x['percentile']:>11.2f}{x['constraint_effect']:>+12.2%}"
               f"{x['manager_effect']:>+10.2%}{qs:>10}{ers[0]:>11}{ers[1]:>10}{ers[2]:>10}")
-    qe, ce = errs["quantum"], errs["classical_matched"]
-    names = ("percentile", "constraint effect", "manager effect")
-    wins = [f"{n}: {'quantum' if a < b else 'classical'}" for n, a, b in zip(names, qe, ce)]
-    print(f"  equal budget ({r['quantum']['queries']} vs {r['classical_matched']['queries']} queries), "
-          f"smaller error in this single run -> " + "; ".join(wins))
+    qq, cm, cr = r["quantum"]["queries"], r["classical_matched"]["queries"], r["classical"]["queries"]
+    print(f"  budgets: quantum {qq} vs classical same-budget set {cm} ({100 * (qq / cm - 1):+.0f}%); "
+          f"plain 5000-sample rejection uses {cr} ({100 * (cr / qq - 1):+.0f}% vs quantum) "
+          f"with errors above -- compare rows, single run")
     ref = scaling_ref(d["P_F"])
     if ref:
         print(f"  single run; multi-rep required-query comparison (tol 0.01, closest P_F={ref[0]:.4f}) in "

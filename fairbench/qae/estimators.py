@@ -258,8 +258,12 @@ def iqae(oracle, eps: float, alpha: float, rng: np.random.Generator, n_shots: in
     the largest k (FindNextK) such that (4k+2)[theta_l, theta_u] lies in one half circle,
     measures N shots after k iterates, combines with the previous rounds if k is unchanged,
     turns the hit-rate CI (Chernoff-Hoeffding with alpha/T split, or Clopper-Pearson
-    ("beta") at level alpha/T) into an angle CI and intersects. Stops when the a-interval
-    half width is <= eps (theta width <= 2 eps in radians). T = ceil(log2(pi/(8 eps))).
+    ("beta") at level alpha/T) into an angle CI and intersects. ``eps`` is an ANGLE
+    tolerance: stops when the theta half-width is <= eps radians, which implies an
+    a-interval half width <= sin(2 theta) eps <= eps (so it over-delivers for small a; use
+    ``iqae_amplitude_tol`` for an amplitude target). T = ceil(log2(pi/(8 eps))).
+    Assumes a noiseless oracle: under noise (e.g. NoisyOracle) it can report a confident
+    wrong interval; use noise-aware ``mlae`` there.
     Chernoff mode also applies the paper's "no overshooting" shot reduction
     N = ceil(N_shots L_max / (eps K 10)) when K > ceil(L_max/eps),
     L_max = arcsin((2/N_shots ln(2T/alpha))^(1/4)). Coverage >= 1 - alpha."""
