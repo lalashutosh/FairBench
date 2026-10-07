@@ -447,10 +447,14 @@ def test_oracle_and_hamiltonian_raise_typeerror_for_new_classes(make):
     u = tiny()
     c = make()
     cs = ConstraintSet([Cardinality(3), SectorCap("X", 1), c])
-    with pytest.raises(TypeError, match=type(c).__name__):
+    if isinstance(c, (CountBound, AvgBound)):
+        # linear rules: the FT oracle encodes them (tests/test_oracle_ext.py)
         feasibility_oracle(u, cs)
-    with pytest.raises(TypeError, match=type(c).__name__):
-        feasibility_oracle(u, cs, mode="bit")
+    else:
+        with pytest.raises(TypeError, match=type(c).__name__):
+            feasibility_oracle(u, cs)
+        with pytest.raises(TypeError, match=type(c).__name__):
+            feasibility_oracle(u, cs, mode="bit")
     with pytest.raises(TypeError, match=type(c).__name__):
         penalty_operator(cs, u)
     # the original classes alone are still encodable

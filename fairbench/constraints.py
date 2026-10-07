@@ -2,8 +2,9 @@
 
 Classes: Cardinality, SectorCap, Exclusion, MinESG, CarbonCap (the original five, which the
 penalty Hamiltonian and the fault-tolerant oracle also encode) and CountBound, AvgBound,
-MinGroups, VolatilityCap, TrackingErrorCap (checked by every sampler and by attribution;
-no Hamiltonian or oracle encoding yet).
+LinearThreshold, MinGroups, VolatilityCap, TrackingErrorCap (checked by every sampler and by
+attribution; no Hamiltonian encoding; ``ft.oracle`` also encodes CountBound, AvgBound and
+LinearThreshold).
 
 A selection is a binary vector x (length n); X is a (m, n) batch.
 Average-based constraints (MinESG, CarbonCap) use the equal-weight average
@@ -130,6 +131,38 @@ class AvgBound(_AvgConstraint):
             raise KeyError(f"universe has no numeric attribute {self.attribute!r}")
         return self._avg_ok(X, values, lambda a: ((a >= self.lower) if self.lower is not None else True)
                             & ((a <= self.upper) if self.upper is not None else True))
+
+
+class LinearThreshold(_Base):
+    """sum_i weights_i x_i  (direction)  threshold, direction ">=" or "<" (strict); float
+    weights of any sign. Any linear rule, e.g. "equal-weight buy-and-hold total return below
+    s": (1/k) sum_i x_i g_i - 1 < s  <=>  LinearThreshold(g, k * (1 + s), "<"), with
+    g_i = prod_t (1 + r_it) the asset's gross return over the window. An empty selection
+    has sum 0 (no special case)."""
+
+    DIRECTIONS = (">=", "<")
+
+    def __init__(self, weights: Sequence[float], threshold: float, direction: str = ">=",
+                 label: str = ""):
+        if direction not in self.DIRECTIONS:
+            raise ValueError(f"direction must be one of {self.DIRECTIONS}, got {direction!r}")
+        self.weights = np.asarray(weights, dtype=float).ravel()
+        if not np.all(np.isfinite(self.weights)):
+            raise ValueError("weights must be finite")
+        self.threshold = float(threshold)
+        self.direction = direction
+        self.label = label
+
+    def values(self, X) -> np.ndarray:
+        """(m,) sum_i weights_i x_i of each row."""
+        X = _batch(X)
+        if X.shape[1] != self.weights.size:
+            raise ValueError(f"LinearThreshold has {self.weights.size} weights, X has {X.shape[1]} columns")
+        return X @ self.weights
+
+    def check_batch(self, X, u):
+        v = self.values(X)
+        return v >= self.threshold if self.direction == ">=" else v < self.threshold
 
 
 class MinGroups(_Base):

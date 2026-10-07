@@ -73,9 +73,10 @@ from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
-from ..constraints import CarbonCap, ConstraintSet, Exclusion, MinESG, SectorCap
+from ..constraints import ConstraintSet
 from ..data import Universe
-from .oracle import DEFAULT_BITS, OracleInfo, Quantisation, _acc_bits, feasibility_oracle, quantise
+from .oracle import (DEFAULT_BITS, ENCODED_RULES, OracleInfo, Quantisation, _acc_bits, _mode_threshold, _plan,
+                     _weighted_specs, feasibility_oracle, quantise)
 
 SCHEDULES = ("known", "bbht", "fixed_point")
 
@@ -202,43 +203,22 @@ def reflection_circuit(n: int, n_qubits: int | None = None, ancillas=None):
 
 # =========================================================================== oracle formula
 def _plans(u: Universe, cs: ConstraintSet, rules):
-    """Mirror of feasibility_oracle's planning: (comp, members, weights, T, smax, rr)."""
-    n, k = u.n, cs.cardinality
-    excluded = set()
-    for c in cs.constraints:
-        if isinstance(c, Exclusion):
-            excluded |= {int(i) for i in c.indices}
-    live = [i for i in range(n) if i not in excluded]
-    plans = []
-    for c in cs.constraints:
-        if isinstance(c, SectorCap):
-            mem = [i for i in live if u.sector[i] == c.sector]
-            if min(len(mem), k) <= c.max_count:
-                continue
-            plans.append(("sector", mem, [1] * len(mem), c.max_count + 1, min(len(mem), k)))
-    for kind, w, T in rules:
-        mem = [i for i in live if w[i] != 0]
-        smax = int(np.sort(w[live])[::-1][:k].sum()) if live else 0
-        if T <= 0:
-            continue
-        plans.append((kind, mem, [int(w[i]) for i in mem], int(T), smax))
-    return excluded, [(c, m, w, T, s, _acc_bits(T, s)) for c, m, w, T, s in plans]
+    """Mirror of feasibility_oracle's planning (the same ``oracle._plan``):
+    (excluded, [(comp, members, weights, T, smax, rr)])."""
+    excluded, _, plans = _plan(u, cs, rules, cs.cardinality)
+    return excluded, [(c, m, w, T, s, _acc_bits(T, s)) for c, _nm, m, w, T, s, _p in plans]
 
 
 def _approx_rules(u: Universe, cs: ConstraintSet, bits: int):
-    """Quantised rules without the scale / threshold search: s = s_max, T = ceil(s k (theta-lo))."""
+    """Quantised rules without the scale / threshold search: s = s_max, T = rounding of the
+    ideal threshold (ceil; strict rules floor + 1)."""
     k = cs.cardinality
     out = []
-    for c in cs.constraints:
-        if isinstance(c, MinESG):
-            kind, v, th = "esg", np.asarray(u.esg_score, float), c.min_avg_score
-        elif isinstance(c, CarbonCap):
-            kind, v, th = "carbon", -np.asarray(u.carbon, float), -c.max_avg
-        else:
-            continue
-        lo, hi = float(v.min()), float(v.max())
+    for sp in _weighted_specs(u, cs, k):
+        lo, hi = float(sp.v.min()), float(sp.v.max())
         s = (2 ** bits - 1) / (hi - lo) if hi > lo else 1.0
-        out.append((kind, np.rint(s * (v - lo)).astype(np.int64), math.ceil(s * k * (th - lo))))
+        out.append((sp.kind, np.rint(s * (sp.v - lo)).astype(np.int64),
+                    _mode_threshold("minmis", sp.t0(s, lo, k), k, sp.strict)))
     return out
 
 
@@ -251,6 +231,9 @@ def oracle_formula_counts(u: Universe, cs: ConstraintSet, bits: int | None = Non
     ideal threshold), typically within ~1% of the built circuit."""
     bits = DEFAULT_BITS if bits is None else int(bits)
     n, k = u.n, cs.cardinality
+    unknown = sorted({type(c).__name__ for c in cs.constraints if not isinstance(c, ENCODED_RULES)})
+    if unknown:
+        raise TypeError(f"no oracle encoding for {unknown}")
     if approx and quant is None:
         rules = _approx_rules(u, cs, bits)
     else:

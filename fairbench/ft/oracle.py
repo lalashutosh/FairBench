@@ -10,6 +10,9 @@ Scope / semantics
 * On weight-k inputs the average rules are linear:
       MinESG(m)     <=>  sum_i esg_i x_i      >=  k m
       CarbonCap(c)  <=>  sum_i carbon_i x_i   <=  k c   <=>  sum_i (-carbon_i) x_i >= -k c
+      AvgBound(a, lo, hi)  <=>  sum_i a_i x_i >= k lo  and  sum_i (-a_i) x_i >= -k hi
+      LinearThreshold(w, t, ">=")  <=>  sum_i w_i x_i >= t
+      LinearThreshold(w, t, "<")   <=>  sum_i (-w_i) x_i > -t      (strict)
   Each is written as  sum_i v_i x_i >= k*theta  and QUANTISED (``quantise``):
       w_i = round(s (v_i - min v)),   s in [s_max/2, s_max],  s_max = (2^b - 1) / (max v - min v)
   i.e. ``b`` bits per weight (w_i in [0, 2^b - 1]); s is picked from ``n_scales`` grid
@@ -18,6 +21,8 @@ Scope / semantics
   (test sum w_i x_i >= T) is chosen to minimise disagreement with the float rule on the
   weight-k states that pass the exact (sector / exclusion) rules - exactly enumerated
   for n <= 16, Monte Carlo (fit / held-out halves) above; ties -> nearest to s*k*(theta - min v).
+  ``quantise(mode=...)`` instead picks provable SUPERSET (zero false negatives) or SUBSET
+  (zero false positives) thresholds; at n > exact_max_n the default is superset.
   ``Quantisation.joint_mismatch`` counts weight-k states whose full quantised feasibility
   differs from ``ConstraintSet.check_batch``.
   AT SCALE QUANTISATION IS PART OF THE PROBLEM DEFINITION: the oracle decides feasibility
@@ -34,6 +39,9 @@ Circuit (gates X, CX, CCX; phase mode additionally one Z / CZ / CCZ; no MCX emit
   adding S, bit r == [S >= T]. The comparator is free (no extra gates).
 * SectorCap(c) over sector members S' (non-excluded): popcount into such an accumulator
   with T = c + 1 (bit r = violation). Vacuous caps (min(|S'|, k) <= c) are skipped.
+  CountBound(I, lo, hi): the same popcount over I' (non-excluded members of I; a repeated
+  index adds its multiplicity) -- one accumulator with T = lo (bit r = satisfied) when
+  lo > 0 and one with T = hi + 1 (bit r = violation) when hi is not vacuous.
 * Weighted sums: for each asset with w_i != 0, controlled-constant add: load w_i into a
   shared zero temp register with CX(x_i -> temp_j) for set bits j, Cuccaro ripple-carry
   add temp into the accumulator (R-bit modular, 2(R-1) Toffolis, one shared carry
@@ -55,7 +63,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from qiskit import QuantumCircuit
 
-from ..constraints import CarbonCap, Cardinality, ConstraintSet, Exclusion, MinESG, SectorCap
+from ..constraints import (AvgBound, CarbonCap, Cardinality, ConstraintSet, CountBound, Exclusion,
+                           LinearThreshold, MinESG, SectorCap)
 from ..data import Universe
 
 # Smallest b with zero joint quantisation mismatch on ALL of p0_instance, island_instance
@@ -67,19 +76,114 @@ DEFAULT_BITS = 11
 
 MCX_TOFFOLI_RULE = "MCX with m controls -> 2m-3 Toffolis using m-2 clean ancillas (none emitted)"
 
+# Rules quantised to integer weighted sums / rules encoded exactly / everything the oracle encodes.
+WEIGHTED_RULES = (MinESG, CarbonCap, AvgBound, LinearThreshold)
+EXACT_RULES = (Cardinality, Exclusion, SectorCap, CountBound)
+ENCODED_RULES = EXACT_RULES + WEIGHTED_RULES
+QUANT_MODES = ("auto", "superset", "subset", "minmis")
+_EPS = 1e-9
+
+
+@dataclass
+class _WSpec:
+    """One weighted rule as  sum_i v_i x_i >= rhs  (``strict``: > rhs) on weight-k states.
+    rhs = k * theta for an average rule (``avg``), = theta for a linear rule."""
+    kind: str                 # "esg" | "carbon" | "avg" | "linear"  (= oracle component)
+    v: np.ndarray
+    theta: float
+    avg: bool
+    strict: bool
+    float_threshold: float    # the rule's own number (min / max average, linear threshold)
+    label: str
+
+    def float_check(self, X: np.ndarray, k: int) -> np.ndarray:
+        """The float rule on weight-k rows, with the same arithmetic as the constraint class
+        (negating v and theta is exact, so CarbonCap / upper bounds / "<" agree bit for bit)."""
+        sv = X @ self.v
+        if self.avg:
+            sv = sv / k
+        return sv > self.theta if self.strict else sv >= self.theta
+
+    def t0(self, s: float, lo: float, k: int) -> float:
+        """Ideal integer-scale threshold s * (rhs - k lo)."""
+        return s * k * (self.theta - lo) if self.avg else s * (self.theta - k * lo)
+
+
+def _weighted_specs(u: Universe, cs: ConstraintSet, k: int) -> list[_WSpec]:
+    """Weighted rules of ``cs`` in order (AvgBound with two bounds gives two specs)."""
+    out = []
+    for c in cs.constraints:
+        if isinstance(c, MinESG):
+            out.append(_WSpec("esg", np.asarray(u.esg_score, float), c.min_avg_score, True, False,
+                              c.min_avg_score, "MinESG"))
+        elif isinstance(c, CarbonCap):
+            out.append(_WSpec("carbon", -np.asarray(u.carbon, float), -c.max_avg, True, False,
+                              c.max_avg, "CarbonCap"))
+        elif isinstance(c, AvgBound):
+            vals = u.numeric(c.attribute)
+            if vals is None:
+                raise KeyError(f"universe has no numeric attribute {c.attribute!r}")
+            vals = np.asarray(vals, float)
+            if c.lower is not None:
+                out.append(_WSpec("avg", vals, c.lower, True, False, c.lower,
+                                  f"avg({c.attribute})>={c.lower:g}"))
+            if c.upper is not None:
+                out.append(_WSpec("avg", -vals, -c.upper, True, False, c.upper,
+                                  f"avg({c.attribute})<={c.upper:g}"))
+        elif isinstance(c, LinearThreshold):
+            if c.weights.size != u.n:
+                raise ValueError(f"LinearThreshold has {c.weights.size} weights, universe has {u.n} assets")
+            lab = c.label or "linear"
+            if c.direction == ">=":
+                out.append(_WSpec("linear", c.weights.copy(), c.threshold, False, False, c.threshold,
+                                  f"{lab}>={c.threshold:g}"))
+            else:   # w.x < t  <=>  (-w).x > -t
+                out.append(_WSpec("linear", -c.weights, -c.threshold, False, True, c.threshold,
+                                  f"{lab}<{c.threshold:g}"))
+    return out
+
+
+def _mode_threshold(mode: str, t0: float, k: int, strict: bool) -> int:
+    """Integer T for  sum w_i x_i >= T  with w_i = rint(s(v_i - lo)) (|rounding| <= 1/2 each,
+    k held assets => |sum error| <= k/2).
+    superset: T = ceil(t0 - k/2)            -> every float-feasible x passes (F subset F_q);
+    subset:   T = ceil(t0 + k/2) (strict: floor(t0 + k/2) + 1) -> every passing x is
+              float-feasible (F_q subset F);
+    otherwise the plain rounding of the ideal threshold."""
+    if mode == "superset":
+        return math.ceil(t0 - k / 2 - _EPS)
+    if mode == "subset":
+        return math.floor(t0 + k / 2 + _EPS) + 1 if strict else math.ceil(t0 + k / 2 + _EPS)
+    return math.floor(t0) + 1 if strict else math.ceil(t0)
+
+
+def _resolve_mode(mode: str, superset: bool | None, exact: bool) -> str:
+    if mode not in QUANT_MODES:
+        raise ValueError(f"mode must be one of {QUANT_MODES}")
+    if superset is not None:                       # legacy kwarg
+        legacy = "superset" if superset else "minmis"
+        if mode not in ("auto", legacy):
+            raise ValueError(f"superset={superset} conflicts with mode={mode!r}")
+        mode = legacy
+    if mode == "auto":
+        mode = "minmis" if exact else "superset"
+    return mode
+
 
 # --------------------------------------------------------------------------- quantisation
 @dataclass
 class QuantRule:
-    kind: str                 # "esg" | "carbon"
-    float_threshold: float    # rule's own threshold (min_avg_score / max_avg)
+    kind: str                 # "esg" | "carbon" | "avg" | "linear"
+    float_threshold: float    # rule's own threshold (min_avg_score / max_avg / bound / linear t)
     weights: np.ndarray       # (n,) int64 in [0, 2^bits - 1]
     threshold: int            # quantised test: sum w_i x_i >= threshold
     scale: float
-    shift: float              # min of v (v = esg or -carbon)
-    ideal_threshold: float    # s * k * (theta - shift)
+    shift: float              # min of v (v = esg, -carbon, +-attribute, +-linear weights)
+    ideal_threshold: float    # s * (rhs - k * shift)
     mismatch: int             # disagreements with the float rule on the fit/eval domain
     n_domain: int
+    strict: bool = False      # float rule is  v.x > rhs  (LinearThreshold "<")
+    label: str = ""
 
 
 @dataclass
@@ -94,17 +198,20 @@ class Quantisation:
     false_neg: int = 0        # float-feasible but rejected by the oracle (biases the sample)
     n_feasible_eval: int = 0  # |F| among the evaluated states
     superset: bool = False    # thresholds chosen so F subset of F_q by construction
+    mode: str = ""            # "superset" | "subset" | "minmis" (resolved; "" -> from superset)
     mismatch_rate: float = field(init=False)
 
     def __post_init__(self):
         self.mismatch_rate = self.joint_mismatch / max(self.n_eval, 1)
+        if not self.mode:
+            self.mode = "superset" if self.superset else "minmis"
 
     def check_batch(self, X: np.ndarray, u: Universe, cs: ConstraintSet) -> np.ndarray:
         """Quantised feasibility (exact rules as-is, weighted rules quantised)."""
         X = np.atleast_2d(X).astype(np.int64)
         ok = np.ones(len(X), dtype=bool)
         for c in cs.constraints:
-            if not isinstance(c, (MinESG, CarbonCap)):
+            if not isinstance(c, WEIGHTED_RULES):
                 ok &= c.check_batch(X, u)
         for r in self.rules:
             ok &= X @ r.weights >= r.threshold
@@ -144,21 +251,30 @@ def _best_threshold(q: np.ndarray, y: np.ndarray, t0: float) -> tuple[int, int]:
 def quantise(u: Universe, cs: ConstraintSet, bits: int | str | None = None, *,
              exact_max_n: int = 16, mc_samples: int = 200_000, seed: int = 0,
              max_bits: int = 20, n_scales: int = 64,
-             superset: bool | None = None) -> Quantisation:
-    """Quantise MinESG / CarbonCap rules to integer weights (``bits`` per weight) and
-    integer thresholds; report mismatch vs the float rules on weight-k states (exact for
-    n <= ``exact_max_n``, else Monte Carlo with ``mc_samples`` fit + ``mc_samples`` held-out).
-    ``bits=None`` -> DEFAULT_BITS; ``bits="auto"`` -> smallest b <= max_bits with zero
-    joint mismatch (on the evaluated states).
-    ``superset`` (default: True when not ``exact``): threshold ``T = ceil(t0 - k/2)``. Each
-    weight is rounded by at most 1/2, so ``sum w_i x_i >= t0 - k/2`` for every float-feasible
-    x, i.e. F is a subset of F_q with zero false negatives *provably* (not just on the sample).
-    A classical float post-check of the measured sample then gives exactly uniform samples
-    over F; the cost is a success factor |F|/|F_q| (``1 - false_pos/|F_q|``)."""
+             superset: bool | None = None, mode: str = "auto") -> Quantisation:
+    """Quantise the weighted rules (MinESG, CarbonCap, AvgBound, LinearThreshold) to integer
+    weights (``bits`` per weight) and integer thresholds; report mismatch vs the float rules
+    on weight-k states (exact for n <= ``exact_max_n``, else Monte Carlo with ``mc_samples``
+    fit + ``mc_samples`` held-out). ``bits=None`` -> DEFAULT_BITS; ``bits="auto"`` ->
+    smallest b <= max_bits with zero joint mismatch (on the evaluated states).
+
+    ``mode`` (threshold choice per weighted rule; each weight is rounded by at most 1/2, so
+    a weight-k sum moves by at most k/2):
+      "superset": T = ceil(t0 - k/2). F subset of F_q (zero false negatives) *provably*; a
+                  classical float post-check of each measured sample then gives exactly
+                  uniform samples over F at a success factor |F|/|F_q|.
+      "subset":   T = ceil(t0 + k/2) (strict rules: floor(t0 + k/2) + 1). F_q subset of F
+                  (zero false positives) provably. With "superset" this BRACKETS any
+                  probability of a monotone event: P_subset <= P_true <= P_superset.
+      "minmis":   T minimising disagreement with the float rule on the evaluated states.
+      "auto":     "minmis" when exact (n <= exact_max_n), else "superset" (the default).
+    For every mode the scale s in [s_max/2, s_max] is chosen to minimise the mismatch
+    (largest s on ties). ``superset`` (legacy bool): True == mode "superset", False ==
+    "minmis"."""
     if bits == "auto":
         for b in range(1, max_bits + 1):
             q = quantise(u, cs, b, exact_max_n=exact_max_n, mc_samples=mc_samples, seed=seed,
-                         n_scales=n_scales, superset=superset)
+                         n_scales=n_scales, superset=superset, mode=mode)
             if q.joint_mismatch == 0:
                 return q
         return q
@@ -167,53 +283,47 @@ def quantise(u: Universe, cs: ConstraintSet, bits: int | str | None = None, *,
         raise ValueError("bits must be >= 1")
     n, k = u.n, _k_of(cs)
     exact = n <= exact_max_n
-    if superset is None:
-        superset = not exact
+    mode = _resolve_mode(mode, superset, exact)
     if exact:
         X_fit = X_eval = _all_weight_k(n, k)
     else:
         rng = np.random.default_rng(seed)
         X_fit = _random_weight_k(n, k, mc_samples, rng)
         X_eval = _random_weight_k(n, k, mc_samples, rng)
-    exact_rules = [c for c in cs.constraints if not isinstance(c, (MinESG, CarbonCap))]
+    exact_rules = [c for c in cs.constraints if not isinstance(c, WEIGHTED_RULES)]
     dom = ConstraintSet(exact_rules).check_batch(X_fit, u)
     Xd = X_fit[dom].astype(np.int64)
     rules = []
-    for c in cs.constraints:
-        if isinstance(c, MinESG):
-            kind, v, theta = "esg", np.asarray(u.esg_score, float), c.min_avg_score
-        elif isinstance(c, CarbonCap):
-            kind, v, theta = "carbon", -np.asarray(u.carbon, float), -c.max_avg
-        else:
-            continue
+    for sp in _weighted_specs(u, cs, k):
+        v = sp.v
         lo, hi = float(v.min()), float(v.max())
         s_max = (2 ** bits - 1) / (hi - lo) if hi > lo else 1.0
-        y = c.check_batch(Xd, u) if len(Xd) else None
+        y = sp.float_check(Xd, k) if len(Xd) else None
         best = None
         # scale search: s in [s_max/2, s_max] (weights stay < 2^bits); fewest mismatches,
         # ties -> largest scale (finest resolution)
         for s in s_max * np.linspace(1.0, 0.5, max(int(n_scales), 1)):
             w = np.rint(s * (v - lo)).astype(np.int64)
-            t0 = s * k * (theta - lo)
-            if superset:
-                T = math.ceil(t0 - k / 2 - 1e-9)
+            t0 = sp.t0(s, lo, k)
+            if mode in ("superset", "subset"):
+                T = _mode_threshold(mode, t0, k, sp.strict)
                 mis = int(((Xd @ w >= T) != y).sum()) if y is not None else 0
             elif y is not None:
                 T, mis = _best_threshold(Xd @ w, y, t0)
             else:
-                T, mis = math.ceil(t0), 0
+                T, mis = _mode_threshold(mode, t0, k, sp.strict), 0
             if best is None or mis < best[3]:
                 best = (s, w, T, mis, t0)
             if mis == 0:
                 break
         s, w, T, mis, t0 = best
-        float_thr = c.min_avg_score if kind == "esg" else c.max_avg
-        rules.append(QuantRule(kind, float_thr, w, T, s, lo, t0, mis, int(len(Xd))))
-    qz = Quantisation(bits, k, rules, 0, len(X_eval), exact)
+        rules.append(QuantRule(sp.kind, sp.float_threshold, w, T, s, lo, t0, mis, int(len(Xd)),
+                               sp.strict, sp.label))
+    qz = Quantisation(bits, k, rules, 0, len(X_eval), exact, mode=mode)
     fq, ff = qz.check_batch(X_eval, u, cs), cs.check_batch(X_eval, u)
     fp, fn = int((fq & ~ff).sum()), int((~fq & ff).sum())
     return Quantisation(bits, k, rules, fp + fn, len(X_eval), exact, fp, fn, int(ff.sum()),
-                        bool(superset))
+                        mode == "superset", mode)
 
 
 # --------------------------------------------------------------------------- circuit build
@@ -290,6 +400,65 @@ def _acc_bits(T: int, smax: int) -> int:
     return r
 
 
+def _plan(u: Universe, cs: ConstraintSet, rules, k: int):
+    """Accumulator plan shared by ``feasibility_oracle`` and ``resources.oracle_formula_counts``.
+    ``rules``: iterable of (kind, int weights (n,), integer threshold T) for the quantised
+    weighted rules. Returns (excluded set, skipped list, plans) with plans =
+    [(comp, name, members, weights, T, smax, flag_polarity)]: the accumulator flag is
+    [sum_{i in members} w_i x_i >= T] and the rule holds iff flag == polarity.
+    Order: SectorCap / CountBound in ``cs`` order, then the weighted rules."""
+    n = u.n
+    excluded: set[int] = set()
+    for c in cs.constraints:
+        if isinstance(c, Exclusion):
+            excluded |= {int(i) for i in c.indices}
+    live = [i for i in range(n) if i not in excluded]
+    skipped: list[str] = []
+    plans = []
+    names: dict[str, int] = {}
+
+    def uname(base):
+        j = names.get(base, 0)
+        names[base] = j + 1
+        return base if j == 0 else f"{base}_{j}"
+
+    for c in cs.constraints:
+        if isinstance(c, SectorCap):
+            mem = [i for i in live if u.sector[i] == c.sector]
+            if min(len(mem), k) <= c.max_count:
+                skipped.append(f"SectorCap({c.sector},{c.max_count}): vacuous (|S'|={len(mem)}, k={k})")
+                continue
+            plans.append(("sector", uname(f"sector_{c.sector}"), mem, [1] * len(mem),
+                          c.max_count + 1, min(len(mem), k), 0))
+        elif isinstance(c, CountBound):
+            idx = np.asarray(c.indices, dtype=np.int64)
+            if idx.size and (idx.min() < 0 or idx.max() >= n):
+                raise ValueError(f"CountBound indices out of range [0, {n})")
+            mult = np.bincount(idx, minlength=n) if idx.size else np.zeros(n, np.int64)
+            mem = [i for i in live if mult[i]]
+            w = [int(mult[i]) for i in mem]          # a repeated index counts repeatedly
+            smax = int(sum(sorted(w, reverse=True)[:k]))
+            tag = f"CountBound({c.label or len(idx)})"
+            if c.min_count > 0:                      # flag = [count >= min] must be 1
+                plans.append(("count", uname("count_min"), mem, w, c.min_count, smax, 1))
+            else:
+                skipped.append(f"{tag} min {c.min_count}: vacuous")
+            if c.max_count is not None:              # flag = [count >= max + 1] must be 0
+                if smax <= c.max_count:
+                    skipped.append(f"{tag} max {c.max_count}: vacuous (max reachable {smax})")
+                else:
+                    plans.append(("count", uname("count_max"), mem, w, c.max_count + 1, smax, 0))
+    for kind, wts, T in rules:
+        wts = np.asarray(wts, dtype=np.int64)
+        mem = [i for i in live if wts[i] != 0]
+        smax = int(np.sort(wts[live])[::-1][:k].sum()) if live else 0
+        if T <= 0:
+            skipped.append(f"{kind}: quantised threshold {T} <= 0 (always satisfied)")
+            continue
+        plans.append((kind, uname(kind), mem, [int(wts[i]) for i in mem], int(T), smax, 1))
+    return excluded, skipped, plans
+
+
 def toffoli_count(circuit: QuantumCircuit) -> int:
     """CCX + CCZ + sum over MCX_m of (2m - 3) (see MCX_TOFFOLI_RULE)."""
     t = 0
@@ -315,39 +484,18 @@ def feasibility_oracle(u: Universe, cs: ConstraintSet, bits: int | str | None = 
     if mode not in ("phase", "bit"):
         raise ValueError("mode must be 'phase' or 'bit'")
     n, k = u.n, _k_of(cs)
-    unknown = sorted({type(c).__name__ for c in cs.constraints
-                      if not isinstance(c, (Cardinality, Exclusion, SectorCap, MinESG, CarbonCap))})
+    unknown = sorted({type(c).__name__ for c in cs.constraints if not isinstance(c, ENCODED_RULES)})
     if unknown:
-        raise TypeError(f"no oracle encoding for {unknown}")
+        raise TypeError(f"no oracle encoding for {unknown}: only linear rules are encoded "
+                        "(MinGroups is not a threshold on a weighted sum; VolatilityCap / "
+                        "TrackingErrorCap are quadratic in x)")
     qz = quant if quant is not None else quantise(u, cs, bits, **quant_kw)
     B = _Builder(n)
     target = B.alloc(1, "target")[0] if mode == "bit" else None
 
-    excluded: set[int] = set()
-    for c in cs.constraints:
-        if isinstance(c, Exclusion):
-            excluded |= {int(i) for i in c.indices}
-    live = [i for i in range(n) if i not in excluded]
-    literals: list[tuple[int, int, str]] = [(e, 0, "exclusion") for e in sorted(excluded)]
-    skipped: list[str] = []
-
     # plan accumulators: (comp, name, members, weights, T, smax, flag_polarity)
-    plans = []
-    for c in cs.constraints:
-        if isinstance(c, SectorCap):
-            mem = [i for i in live if u.sector[i] == c.sector]
-            if min(len(mem), k) <= c.max_count:
-                skipped.append(f"SectorCap({c.sector},{c.max_count}): vacuous (|S'|={len(mem)}, k={k})")
-                continue
-            plans.append(("sector", f"sector_{c.sector}", mem, [1] * len(mem), c.max_count + 1,
-                          min(len(mem), k), 0))
-    for r in qz.rules:
-        mem = [i for i in live if r.weights[i] != 0]
-        smax = int(np.sort(r.weights[live])[::-1][:k].sum()) if live else 0
-        if r.threshold <= 0:
-            skipped.append(f"{r.kind}: quantised threshold {r.threshold} <= 0 (always satisfied)")
-            continue
-        plans.append((r.kind, r.kind, mem, [int(r.weights[i]) for i in mem], r.threshold, smax, 1))
+    excluded, skipped, plans = _plan(u, cs, [(r.kind, r.weights, r.threshold) for r in qz.rules], k)
+    literals: list[tuple[int, int, str]] = [(e, 0, "exclusion") for e in sorted(excluded)]
 
     accs = []
     for comp, name, mem, w, T, smax, pol in plans:
@@ -424,8 +572,8 @@ def feasibility_oracle(u: Universe, cs: ConstraintSet, bits: int | str | None = 
         getattr(qc, nm)(*qs)
 
     comps: dict[str, dict] = {c: {"toffoli": 0, "cx": 0, "x": 0, "qubits": 0}
-                              for c in ("sector", "exclusion", "esg", "carbon", "cardinality",
-                                        "and_flags", "uncompute")}
+                              for c in ("sector", "count", "exclusion", "esg", "carbon", "avg",
+                                        "linear", "cardinality", "and_flags", "uncompute")}
     for nm, qs, c in B.gates:
         d = comps[c]
         if nm in ("ccx", "ccz"):
