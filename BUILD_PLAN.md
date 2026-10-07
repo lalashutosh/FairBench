@@ -256,3 +256,29 @@ Example mandate (fictional, rewritten to exercise the new kinds) on `named_unive
 Prompt dry run repeated with the new prompt (Claude Sonnet agent, no repo access, `results/mandate_rules_dryrun_sonnet.json`): valid spec, no unverified quotes, identical on all 15 enforceable rules including every new kind, identical compiled constraint set on 60k portfolios; it split the stewardship sentence into two unmapped rules. Still no live API call.
 
 Tests after M2: 578 green (~40 s). `tests/test_constraints_extra.py` (new classes, data fields, oracle/Hamiltonian guards, samplers) and the extended `tests/test_rules.py` / `tests/test_mandate.py` were written by a Sonnet agent, including a brute-force check of a 16-rule spec against an independent evaluation over all 495 subsets of a 12-asset universe. Follow-up from its report: name counts must be whole numbers (`validate_spec`).
+
+---
+# QA plan — quantum amplitude estimation for attribution statistics (started 2026-10-08, branch `quantum-qae`, local only)
+
+Base: 1a42733 (main after PR #3). Goal: a meaningful, honest quantum angle *on the finance quantity itself*. The attribution outputs are Monte Carlo expectations over the uniform feasible set F:
+- percentile p = P_{x~U(F)}[S(x) < S_fund]  (= |G|/|F|, G = F ∩ {S < S_fund})
+- null median / benchmark median (quantiles → bisection on a threshold, each step a threshold-probability estimate)
+- feasible fraction P_F = |F|/C(n,k) (rule tightness)
+Classical MC needs ~1/(ε² P_F) proposals; amplitude estimation (QAE) over the Dicke state needs ~1/(ε √P_F)-type Grover queries. Claim to test: the quadratic *query* advantage on the real attribution instance (exact simulation), then honest NISQ (noise) and FT (wall-clock) break-even.
+
+Linearity contract: QAE path uses S(x) = buy-and-hold equal-weight total return = (1/k) Σ x_i g_i − 1, g_i = Π_t(1+r_it) (attribute(..., rebalance=False)). Linear in x ⇒ same weighted-sum comparator as MinESG. Rebalanced returns / Sharpe are NOT linear: out of scope, stated.
+
+Query conventions: classical query = 1 proposal + feasibility/statistic evaluation. Quantum query = 1 application of Q = A S_0 A† S_χ (1 oracle call, 2 Dicke preps); a shot after m iterates costs m queries + 1 state prep.
+
+| Wave | Agent | Model | Owns | Done when |
+|---|---|---|---|---|
+| QA-1 | AE estimators | **opus** | `fairbench/qae/__init__.py`, `qae/estimators.py`, `tests/test_qae_estimators.py` | IdealOracle / NoisyOracle / SubspaceOracle; classical MC, canonical (QPE) AE, IQAE (Grinko 2021), MLAE (Suzuki 2020; exp/linear/power-law schedules, noise-aware likelihood); CIs; query accounting; subspace oracle matches grover_subspace_state; error-vs-queries slope ≈ −1 (quantum) vs −½ (MC) |
+| QA-2 | oracle ext | **opus** | `constraints.py` (add `LinearThreshold` only), `ft/oracle.py`, `ft/resources.py` (formula counts for new rules only), `tests/test_oracle_ext.py` | oracle encodes CountBound, AvgBound, LinearThreshold (return comparator); gate-level revsim == float rule (exact n ≤ 16) with superset/subset quantisation option; formula counts == built |
+| QA-3 | QAE attribution + scaling | sonnet | `fairbench/qae/attribution_qae.py`, `scripts/qae_scaling.py`, `tests/test_qae_attribution.py`, `results/qae_scaling*` | `qae_attribute()` → percentile, null/benchmark medians, effects, with query counts; matches classical `attribute(rebalance=False)`; log-log error vs queries on the n=16 demo instance, fitted slopes, multi-seed |
+| QA-4 | noise / NISQ | sonnet | `scripts/qae_noise.py`, `results/qae_noise*` | MLAE/IQAE under depolarising decay sweep; real circuit at tiny n on Aer noise model; transpiled CX/depth at n = 8..16 → honest NISQ feasibility statement |
+| QA-5 | FT break-even | sonnet | `scripts/qae_breakeven.py`, `results/qae_breakeven*` | per-query FT cost with return comparator; classical lean cost incl. return eval; ε* (percentile precision) at which QAE wins, n = 50..200 |
+| QA-6 | sweeps | haiku | results only | seed/hyper-parameter sweeps of QA-3/4 scripts as directed |
+| QA-R | review | **opus** read-only | — | findings + pitch-safe claims; fair classical baselines (incl. exact counting DP / stratified MC / quasi-MC) |
+| QA-F | fixes | by severity | per findings | green + commit |
+
+Safety: every heavy run `ulimit -v 4000000`, BLAS threads ≤ 2, `timeout`; no uncapped multiprocessing.
