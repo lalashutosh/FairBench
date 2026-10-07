@@ -34,7 +34,8 @@ from .estimators import (AEResult, IdealOracle, SubspaceOracle, canonical_ae, cl
 
 __all__ = ["linear_return_scores", "portfolio_score", "ExactInstance", "exact_masks",
            "make_oracle", "run_ae", "qae_percentile", "qae_quantile", "qae_attribute",
-           "classical_percentile", "classical_quantile", "QAEResult", "QAEAttribution"]
+           "classical_percentile", "classical_quantile", "QAEResult", "QAEAttribution",
+           "RankTable", "iid_shared_sample", "SwapChainBank", "swap_connectivity", "exhaustive_cost"]
 
 
 # ============================================================================ scores
@@ -327,6 +328,175 @@ def classical_quantile(inst: ExactInstance, q: float, N: int, rng: np.random.Gen
     return float(np.sort(sc)[max(int(math.ceil(q * sc.size)) - 1, 0)])
 
 
+# ============================================================================ fair classical baselines
+def exhaustive_cost(inst: ExactInstance) -> int:
+    """Classical enumeration: C(n_allowed, k) feasibility+score evaluations give the EXACT
+    percentile and medians (zero error). Beats every sampler when this is small."""
+    return math.comb(len(inst.allowed), inst.k)
+
+
+class RankTable:
+    """Per-state lookup for the feasible set F, ordered by score: ``bins`` equal-count rank bins
+    (bin of state = floor(rank * B / |F|), -1 if infeasible) and the 'below the fund' flag.
+    Median/percentile estimators from bin-count histograms: the median-rank resolution is
+    1/(2B) <= 2.5e-4 for B=2000 (<< the 5e-3 tolerances used)."""
+
+    def __init__(self, inst: ExactInstance, s: float, bins: int = 2000):
+        self.inst, self.s = inst, s
+        F = np.flatnonzero(inst.feasible)
+        self.nF = len(F)
+        self.B = B = max(1, min(bins, self.nF))
+        order = F[np.argsort(inst.scores[F], kind="stable")]
+        self.bin = np.full(inst.C, -1, np.int32)
+        self.bin[order] = (np.arange(self.nF) * B // self.nF).astype(np.int32)
+        self.below = inst.feasible & (inst.scores < s)
+        self.exact_pct = float(self.below.sum() / self.nF)
+
+    def pmf(self) -> np.ndarray:
+        """probabilities of the 2B+1 categories (bin*2+below ; last = infeasible) under one
+        uniform proposal over all C weight-k selections."""
+        cat = np.where(self.bin >= 0, self.bin * 2 + self.below, 2 * self.B)
+        return np.bincount(cat, minlength=2 * self.B + 1) / self.inst.C
+
+    def median_rank_error(self, hist: np.ndarray) -> np.ndarray:
+        """hist (..., B) feasible counts per rank bin -> |rank of sample median - 1/2|
+        (NaN if empty)."""
+        c = np.cumsum(hist, axis=-1)
+        n = c[..., -1]
+        m = (c >= 0.5 * n[..., None]).argmax(axis=-1)
+        err = np.abs((m + 0.5) / self.B - 0.5)
+        return np.where(n > 0, err, np.nan)
+
+
+def iid_shared_sample(tab: RankTable, N: int, rng: np.random.Generator):
+    """ONE i.i.d. rejection sample set of N uniform proposals (exact multinomial draw), shared by
+    both statistics. Returns (percentile estimate, median-rank error, #feasible); estimates are
+    NaN if no proposal was feasible."""
+    cnt = rng.multinomial(int(N), tab.pmf())
+    nF = int(cnt[:-1].sum())
+    if nF == 0:
+        return float("nan"), float("nan"), 0
+    pair = cnt[:-1].reshape(-1, 2)
+    return (float(pair[:, 1].sum() / nF),
+            float(tab.median_rank_error(pair.sum(axis=1))), nF)
+
+
+def swap_connectivity(inst: ExactInstance) -> dict:
+    """Connected components of F under single swaps (one held asset <-> one free allowed asset).
+    A swap Metropolis chain started in a component never leaves it. Returns n_components,
+    largest component fraction of |F|, and ``start_coverage`` = E[fraction of F reachable from
+    a start drawn uniformly from F] = sum_c (|c|/|F|)^2."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    allowed = inst.allowed.astype(np.int64)
+    nA, k = len(allowed), inst.k
+    masks = (np.int64(1) << inst.idx.astype(np.int64)).sum(axis=1)
+    order = np.argsort(masks)
+    sm = masks[order]
+    feas = inst.feasible[order]
+    fpos = np.flatnonzero(feas)
+    comp_id = np.full(len(sm), -1, np.int64)
+    comp_id[fpos] = np.arange(len(fpos))
+    idx = inst.idx[order][fpos].astype(np.int64)             # (nF, k)
+    rows, cols = [], []
+    # held -> mask of free assets per state
+    m_held = (np.int64(1) << idx).sum(axis=1)
+    allmask = (np.int64(1) << allowed).sum()
+    m_free = allmask & ~m_held
+    free_assets = [a for a in allowed.tolist()]
+    for ai in range(k):
+        i = idx[:, ai]
+        for j in free_assets:
+            has = (m_free >> j) & 1
+            sel = np.flatnonzero(has)
+            nm = m_held[sel] ^ (np.int64(1) << i[sel]) ^ (np.int64(1) << j)
+            pos = np.searchsorted(sm, nm)
+            ok = feas[pos]
+            rows.append(sel[ok]); cols.append(comp_id[pos[ok]])
+    rows = np.concatenate(rows); cols = np.concatenate(cols)
+    nF = len(fpos)
+    g = coo_matrix((np.ones(len(rows), np.int8), (rows, cols)), shape=(nF, nF))
+    nc, lab = connected_components(g, directed=False)
+    sizes = np.bincount(lab) / nF
+    return dict(n_components=int(nc), largest=float(sizes.max()), start_coverage=float((sizes ** 2).sum()),
+                n_isolated=int((np.bincount(lab) == 1).sum()))
+
+
+class SwapChainBank:
+    """R independent swap-move Metropolis chains on F (uniform target; propose swapping a random
+    held asset with a random free allowed asset, accept iff feasible, otherwise stay).
+    One classical query = one proposed move incl. its feasibility check. Each chain starts at a
+    state drawn uniformly from F, whose rejection-sampling cost (Geometric(P_F) proposals,
+    drawn per chain) is CHARGED. Estimator at move-checkpoint T: uses the states visited during
+    moves (T/4, T], i.e. a burn-in of T/4 moves, also charged. All chains are advanced in
+    lockstep with vectorised numpy (identical law to ``baselines.mcmc_swap_sample``, but the
+    feasibility check is a lookup in the enumerated table)."""
+
+    def __init__(self, tab: RankTable):
+        self.tab = tab
+        inst = tab.inst
+        masks = (np.int64(1) << inst.idx.astype(np.int64)).sum(axis=1)
+        self.order = np.argsort(masks)
+        self.sm = masks[self.order]
+        self.bin_s = tab.bin[self.order]
+        self.below_s = tab.below[self.order]
+        self.idx_s = inst.idx[self.order].astype(np.int64)
+        self.fpos = np.flatnonzero(self.bin_s >= 0)
+
+    def run(self, R: int, t_max: int, rng: np.random.Generator, j0: int = 8, back: int = 4):
+        """-> dict(T=checkpoints, pct_err (R,len), med_err (R,len), init_q (R,)).
+        Checkpoints T_j = round(2^(j/2)); burn-in T_{j-back} = T_j/4 (back=4)."""
+        tab, inst = self.tab, self.tab.inst
+        k, B = inst.k, tab.B
+        allowed = inst.allowed.astype(np.int64)
+        nf = len(allowed) - k
+        pos = rng.choice(self.fpos, size=R)
+        init_q = rng.geometric(tab.nF / inst.C, size=R)
+        held = self.idx_s[pos].copy()
+        free = np.empty((R, nf), np.int64)
+        for r in range(R):
+            free[r] = np.setdiff1d(allowed, held[r])
+        mask = self.sm[pos].copy()
+        ar = np.arange(R)
+        hist = np.zeros((R, B), np.int32)
+        below = np.zeros(R, np.int64)
+        Ts = [int(round(2 ** (j / 2))) for j in range(0, 200) if int(round(2 ** (j / 2))) <= t_max]
+        Ts = sorted(set(Ts))
+        cp = {T: i for i, T in enumerate(Ts)}
+        snaps = {}
+        one = np.int64(1)
+        blk = 2048
+        for t in range(1, t_max + 1):
+            if (t - 1) % blk == 0:
+                A_blk = rng.integers(k, size=(blk, R)); B_blk = rng.integers(nf, size=(blk, R))
+            a, b = A_blk[(t - 1) % blk], B_blk[(t - 1) % blk]
+            i = held[ar, a]; j = free[ar, b]
+            nm = mask ^ (one << i) ^ (one << j)
+            p = np.searchsorted(self.sm, nm)
+            ok = self.bin_s[p] >= 0
+            sel = np.flatnonzero(ok)
+            if sel.size:
+                held[sel, a[sel]] = j[sel]
+                free[sel, b[sel]] = i[sel]
+                mask[sel] = nm[sel]
+                pos[sel] = p[sel]
+            hist[ar, self.bin_s[pos]] += 1
+            below += self.below_s[pos]
+            if t in cp:
+                snaps[t] = (hist.copy(), below.copy())
+        T_out, pe, me = [], [], []
+        for idx_j, T in enumerate(Ts):
+            if idx_j - back < 0 or Ts[idx_j - back] < 1:
+                continue
+            T0 = Ts[idx_j - back]
+            h1, b1 = snaps[T]; h0, b0 = snaps[T0]
+            n = T - T0
+            pe.append(np.abs((b1 - b0) / n - tab.exact_pct))
+            me.append(tab.median_rank_error(h1 - h0))
+            T_out.append(T)
+        return dict(T=np.array(T_out), pct_err=np.array(pe).T, med_err=np.array(me).T, init_q=init_q)
+
+
 # ============================================================================ top level
 @dataclass
 class QAEAttribution:
@@ -345,7 +515,7 @@ class QAEAttribution:
         e, c = self.exact, self.classical
         return "\n".join([
             f"  fund buy-and-hold return {self.fund:+.2%}   quantum queries {self.queries}",
-            f"  {'':<20}{'QAE':>10}{'exact':>10}{'classical@same budget':>24}",
+            f"  {'':<20}{'QAE':>10}{'exact':>10}{'classical (shared set)':>24}",
             f"  {'percentile (%)':<20}{self.percentile:>10.2f}{e['percentile']:>10.2f}{c['percentile']:>24.2f}",
             f"  {'null median':<20}{self.null_median:>10.2%}{e['null_median']:>10.2%}{c['null_median']:>24.2%}",
             f"  {'benchmark median':<20}{self.benchmark_median:>10.2%}{e['benchmark_median']:>10.2%}"
@@ -361,8 +531,9 @@ def qae_attribute(u: Universe, cs: ConstraintSet, fund, method: str = "iqae",
                   n_bisect: int = 14, K: int = 8, shots: int = 50,
                   rng: np.random.Generator | None = None, oracle_kind: str = "auto") -> QAEAttribution:
     """Percentile, null/benchmark median, constraint and manager effects by AE, with the exact
-    values and the classical rejection-sampling estimates at the SAME per-statistic query
-    budget. Total-return, equal-weight, buy-and-hold (rebalance=False) statistic only."""
+    values and the classical i.i.d. rejection estimates: one shared sample set (percentile + null
+    median) of max(quantum percentile, quantum null-median) proposals, plus a cardinality-only
+    set for the benchmark median. Total-return, equal-weight, buy-and-hold (rebalance=False) statistic only."""
     rng = rng or np.random.default_rng(0)
     inst = ExactInstance.build(u, cs)
     inst_b = ExactInstance.build(u, cs, cardinality_only=True)
@@ -379,11 +550,31 @@ def qae_attribute(u: Universe, cs: ConstraintSet, fund, method: str = "iqae",
                  percentile_half_ties=100 * inst.percentile(s, "half"),
                  null_median=ex_nm, benchmark_median=ex_bm, constraint_effect=ex_nm - ex_bm,
                  manager_effect=s - ex_nm, P_F=inst.a_F, C=inst.C)
-    cp = classical_percentile(inst, s, p.oracle_queries, rng)
-    cnm = classical_quantile(inst, 0.5, nm.oracle_queries, rng)
+    # Fair classical comparison: ONE shared i.i.d. rejection set (percentile AND null median come
+    # from the same proposals), sized to the larger of the two quantum budgets; the benchmark
+    # median is a separate cardinality-only i.i.d. set (no feasibility test) with the quantum
+    # benchmark budget. Also reported: the (unfair-to-classical) separate-sets accounting.
+    N_shared = max(p.oracle_queries, nm.oracle_queries)
+    tab = RankTable(inst, s)
+    # percentile and null median both come from this one multinomial draw (the shared set)
+    cnt = rng.multinomial(int(N_shared), tab.pmf())
+    pair = cnt[:-1].reshape(-1, 2)
+    nF = int(pair.sum())
+    if nF:
+        cp = float(pair[:, 1].sum() / nF)
+        hist = pair.sum(axis=1)
+        m = int(np.searchsorted(np.cumsum(hist), 0.5 * nF))
+        sc_sorted = np.sort(inst.scores[inst.feasible])
+        cnm = float(sc_sorted[min(int((m + 0.5) / tab.B * len(sc_sorted)), len(sc_sorted) - 1)])
+    else:
+        cp, cnm = float("nan"), float("nan")
     cbm = classical_quantile(inst_b, 0.5, bm.oracle_queries, rng)
     classical = dict(percentile=100 * cp, null_median=cnm, benchmark_median=cbm,
-                     constraint_effect=cnm - cbm, manager_effect=s - cnm)
+                     constraint_effect=cnm - cbm, manager_effect=s - cnm,
+                     queries=dict(shared_set=N_shared, benchmark=bm.oracle_queries,
+                                  total=N_shared + bm.oracle_queries,
+                                  separate_sets_total=p.oracle_queries + nm.oracle_queries + bm.oracle_queries),
+                     feasible_in_shared_set=nF)
     tot = p.oracle_queries + nm.oracle_queries + bm.oracle_queries
     return QAEAttribution(100 * p.estimate, nm.estimate, bm.estimate, ce, me, s,
                           dict(percentile=p.oracle_queries, null_median=nm.oracle_queries,
