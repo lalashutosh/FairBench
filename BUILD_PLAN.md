@@ -156,3 +156,28 @@ Break-even P_F* (known schedule, n = 100 / 200):
 - P* ∝ c_classical², so a compiled O(k) classical check (~10–30× faster than numpy) would lower P* by a further 10²–10³.
 
 Pitch-safe claim (AA-4 wording, updated): *AA over the Dicke state, with integer-quantised superset thresholds and a classical float post-check, gives samples exactly uniform over the feasible set; the oracle is verified gate-level against exact enumeration for n ≤ 16 and against the quantised rule at n = 50, with zero false negatives by construction. It costs ~120–130·n Toffoli for the oracle, but Dicke-state preparation dominates the T-count (~85–90%), using ~200–400 algorithmic logical qubits at n = 100–200 (excluding factories/routing). Under stated FT assumptions (1–10 µs per T-layer) it beats single-core numpy rejection sampling only if the feasible fraction is below ~1e-9 to 1e-12; that bound is sensitive to constants on both sides, and an optimised classical check pushes it lower. In our synthetic constraint family at n ≤ 200 the feasible fraction is 1e-2 to 2e-1, so there is no wall-clock advantage. Larger universes, where the feasible fraction shrinks, were not evaluated.*
+
+---
+# P2 — attribution app (2026-10-07)
+
+Base: commit 3ade8bb. Files: `fairbench/apps/attribution.py`, `fairbench/data.py` (`load_returns`, `synthetic_returns`, `load_universe(returns_path=)`), `tests/test_attribution.py` (17 tests), `scripts/demo_attribution.py`. 255 tests green. Demo: 39 s, peak RSS 0.3 GB.
+
+Design: `attribute(u, cs, fund_holdings, ...)` draws N feasible portfolios with a pluggable sampler, weights them with `postprocess.assign_weights`, computes the statistic over `u.returns`, and returns `fund − benchmark = constraint effect (null median − benchmark) + manager effect (fund − null median)` plus the fund's mid-rank percentile. Default benchmark = median cardinality-only random portfolio (same k, same weighting). CIs are distribution-free order-statistic intervals for the medians (Monte Carlo error only). Sampler output is checked for feasibility; an infeasible fund is flagged, not rejected.
+
+Demo (SYNTHETIC, planted ground truth; `scripts/demo_attribution.py`, seed 0):
+- Headline: `scaled_family(100, k=20, esg_q=0.6, carbon_q=0.3)` + Exclusion of the 10 most carbon-intensive names (feasible fraction ~0.36%), 756 Gaussian periods, planted +8%/yr per s.d. of carbon intensity, fund planted at rank 70 in an independent pool of 2000 feasible portfolios.
+
+| quantity | value |
+|---|---|
+| fund / benchmark / same-rules median | 19.42% / 23.64% / 14.27% |
+| active | −4.22 pts |
+| constraint effect | −9.38 pts, 95% MC CI [−9.90, −8.80] |
+| manager effect | +5.16 pts, 95% MC CI [+4.71, +5.44] |
+| percentile | 68.5 ± 0.7 (planted 70) |
+| Sharpe check | percentile 85.0, constraint −0.513, manager +0.634 |
+| cost | 280 proposals per feasible sample |
+
+- Sampler swap, n = 16, k = 5 (150 feasible portfolios): exact enumeration percentile 69.0; rejection 69.8 ± 0.6 (29.7 proposals/sample); Dicke `aer_statevector` 68.7 ± 0.7 (30.0 shots/sample); two-sample KS between the two nulls D = 0.013, p = 0.82.
+
+Pitch-safe wording: *On a synthetic case with a planted effect, the tool recovers both the cost of the rules and the fund's planted rank; swapping the classical sampler for the Dicke circuit gives the same attribution within Monte Carlo error. No real fund has been analysed, holdings are static over the window, and a single window's percentile is not evidence of skill.*
+

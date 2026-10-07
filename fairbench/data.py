@@ -24,7 +24,7 @@ class Universe:
 
 
 def load_universe(csv_path: str | Path, cov_path: str | Path | None = None,
-                  default_var: float = 0.04) -> Universe:
+                  default_var: float = 0.04, returns_path: str | Path | None = None) -> Universe:
     """Load a universe from CSV.
 
     Schema (one row per asset, header required):
@@ -34,7 +34,7 @@ def load_universe(csv_path: str | Path, cov_path: str | Path | None = None,
         index column (``pd.read_csv(index_col=0)``), reordered to match tickers;
       * else if a ``sigma`` column exists: diag(sigma**2);
       * else: identity scaled by ``default_var`` (0.04, i.e. 20% vol).
-    ``returns`` is None.
+    ``returns`` is None unless ``returns_path`` is given (see ``load_returns``).
     """
     df = pd.read_csv(csv_path)
     missing = {"ticker", "mu", "sector", "esg_score", "carbon"} - set(df.columns)
@@ -58,8 +58,35 @@ def load_universe(csv_path: str | Path, cov_path: str | Path | None = None,
         sector=df["sector"].astype(str).tolist(),
         esg_score=df["esg_score"].to_numpy(dtype=float),
         carbon=df["carbon"].to_numpy(dtype=float),
-        returns=None,
+        returns=None if returns_path is None else load_returns(returns_path, tickers),
     )
+
+
+def load_returns(csv_path: str | Path, tickers: list[str]) -> pd.DataFrame:
+    """Load historical simple returns: wide CSV, first column = period/date index,
+    one column per ticker. Columns are reordered to ``tickers`` (extra columns are
+    dropped); missing tickers or NaNs raise ValueError."""
+    r = pd.read_csv(csv_path, index_col=0)
+    r.columns = r.columns.astype(str)
+    missing = [t for t in tickers if t not in r.columns]
+    if missing:
+        raise ValueError(f"returns CSV missing tickers: {missing[:10]}")
+    r = r[list(tickers)].astype(float)
+    if r.isna().any().any():
+        raise ValueError("returns CSV contains NaNs for the requested tickers")
+    return r
+
+
+def synthetic_returns(u: Universe, periods: int = 252, periods_per_year: int = 252,
+                      mu_shift: np.ndarray | None = None, seed: int | None = 0) -> pd.DataFrame:
+    """SYNTHETIC (periods, n) simple returns: i.i.d. Gaussian with annual mean
+    ``u.mu + mu_shift`` and annual covariance ``u.cov``, scaled to the period.
+    ``mu_shift`` (n,) plants a return tilt (e.g. an ESG drag) for attribution demos."""
+    rng = np.random.default_rng(seed)
+    mean = np.asarray(u.mu, dtype=float) + (0.0 if mu_shift is None else np.asarray(mu_shift, dtype=float))
+    r = rng.multivariate_normal(mean / periods_per_year, np.asarray(u.cov) / periods_per_year,
+                                size=periods, method="cholesky")
+    return pd.DataFrame(r, columns=list(u.tickers), index=pd.RangeIndex(periods, name="period"))
 
 
 def synthetic_universe(n: int, n_sectors: int, seed: int | None = 0) -> Universe:

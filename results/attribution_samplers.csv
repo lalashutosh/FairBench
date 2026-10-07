@@ -1,0 +1,4 @@
+sampler,percentile,percentile_se,null_median,constraint_effect,cost_per_sample
+exact enumeration,69.000,nan,0.084718,nan,
+rejection (classical),69.760,0.650,0.086740,-0.136553,29.7 proposals
+Dicke circuit, aer_statevector,68.700,0.656,0.082696,-0.140598,30.0 shots
