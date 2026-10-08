@@ -1,23 +1,28 @@
 # FairBench — handoff
 
-_Last updated 2026-10-07 (after the AI mandate layer and the ten constraint classes). Repo: `https://github.com/lalashutosh/FairBench.git`. Detailed wave-by-wave log and numbers: [`BUILD_PLAN.md`](BUILD_PLAN.md)._
+_Last updated 2026-10-08 (after the quantum amplitude estimation wave, QA). Repo: `https://github.com/lalashutosh/FairBench.git`. Detailed wave-by-wave log and numbers: [`BUILD_PLAN.md`](BUILD_PLAN.md); pitch schedule: [`PITCH_PLAN.md`](PITCH_PLAN.md)._
 
 ## Start here (next session)
 
-**State of the repo.** Everything is on `main`. Run `git pull` before starting.
+**State of the repo.** Everything is on `main` (the `quantum-qae` branch was fast-forwarded into it on 2026-10-08). Run `git pull` before starting. 680 tests, all green, all offline.
 
-**What the last session did (2026-10-07).**
-- P2: `fairbench/apps/attribution.py`, `scripts/demo_attribution.py`, `README.md`, pitch deck draft (11 slides): https://claude.ai/artifact/Do4km8NeU9qw4oZvxEniJK (lives only in that artifact; private until shared; layout not checked visually).
-- **Ten constraint classes** instead of five (`constraints.py`): added `CountBound`, `AvgBound`, `MinGroups`, `VolatilityCap`, `TrackingErrorCap`. The universe can now carry numeric `attributes` and label `categories` besides `flags`.
-- **AI mandate layer (new):** `fairbench/mandate.py` asks Claude to turn a fund's policy text into a rule spec (JSON); `fairbench/rules.py` compiles the spec into a `ConstraintSet` and reports what every sentence became. Demo: `scripts/demo_mandate.py`. Details in "AI mandate layer" below.
-- Samplers now draw only from non-excluded assets, which made the attribution demo ~10x cheaper and changed its numbers slightly. Results, README, deck slides 4/5/9 and this file use the new numbers.
+**What the last session did (2026-10-07 night → 2026-10-08 morning): a meaningful quantum angle (QA wave).**
+- **Idea:** the attribution outputs are Monte Carlo averages over the rule-abiding portfolios. The fund's percentile is a ratio of two amplitudes over the Dicke state, so **quantum amplitude estimation (QAE)** is the textbook route to a quadratic query advantage on exactly the quantity the tool reports.
+- **Built:** `fairbench/qae/` (amplitude-estimation library; percentile / median / whole-attribution estimators; hybrid classical-warm-start median; exact-counting DP baseline; demo bridge). `constraints.LinearThreshold` (the "portfolio return below the fund's" rule). Oracle encodings for `CountBound`, `AvgBound` and `LinearThreshold`, with superset/subset quantisation modes.
+- **Studies:** query scaling (`qae_scaling.py`); noise and NISQ feasibility (`qae_noise.py`); fault-tolerant break-even (`qae_breakeven.py`); example mandate (`qae_mandate.py`); exact-counting DP (`qae_dp_baseline.py`); hybrid median (`qae_hybrid.py`).
+- **Pitch assets:** figure `results/qae_pitch_figure.png` (one 16:9 slide) and demo `scripts/demo_qae.py` (~2 s).
+- **Reviews:** three independent read-only reviews. All findings fixed, including fair classical baselines (swap-MCMC, shared samples, enumeration), charging every quantum shot, and no use of true amplitudes to set parameters.
+- **Headline (finding #8 below):** quadratically fewer queries in noiseless simulation, robust where tight mandates fragment the feasible set. No advantage on today's hardware, and no wall-clock advantage even fault-tolerant.
 
 **Do next, in this order.**
 1. **Run the AI layer against the real API.** It has never made a live call. Set `ANTHROPIC_API_KEY` in the shell (the user does this; never commit a key), then `.venv/bin/python scripts/demo_mandate.py --live`. It prints whether Claude's spec matches the hand-written reference and saves `results/mandate_rules_live.json`. Fix the prompt in `fairbench/mandate.py` if they differ.
-2. **Try it on a real fund's policy text** (a prospectus or SFDR pre-contractual disclosure). Expect new rule types; add them to `RULE_FIELDS` and `compile_spec` in `fairbench/rules.py`, and to the kinds list in `SYSTEM_PROMPT`.
+2. **Try it on a real fund's policy text** (a prospectus or SFDR pre-contractual disclosure). Expect new rule types: add them to `RULE_FIELDS` and `compile_spec` in `fairbench/rules.py`, and to the kinds list in `SYSTEM_PROMPT`.
 3. **Real fund data** for the attribution: holdings, universe data (sector, ESG score, carbon, plus `flag_<name>` / `attr_<name>` / `cat_<name>` columns for whatever the mandate refers to) and returns. Everything shown so far is synthetic.
-4. Deck: add a slide for the AI layer, fill `[team member names]` / `[contact]`, cut to the time limit.
-5. Optional: optimizer pivot (`apps/optimizer.py`), hardware run.
+4. **Deck:**
+   - Add a slide for the AI layer.
+   - Replace the quantum slides with the QA story: use `results/qae_pitch_figure.png` and the reviewed paragraph in `BUILD_PLAN.md` → "QA results".
+   - Fill `[team member names]` / `[contact]` and cut to the time limit.
+5. **Optional:** optimizer pivot (`apps/optimizer.py`); hardware run (feasibility only); quantum-walk speedup of MCMC (not explored).
 
 **Decisions made by the assistant that the team has not confirmed.**
 - Benchmark = median random portfolio with the same k and no other rule (an index can be passed via `benchmark_returns`).
@@ -29,7 +34,11 @@ _Last updated 2026-10-07 (after the AI mandate layer and the ten constraint clas
 
 **Gaps to know about.**
 - No live API validation yet (see step 1). Evidence so far: offline tests with a fake client, and a dry run where a Claude Sonnet agent answered the exact prompt and reproduced the reference rules.
-- The five new constraint classes are checked by the samplers and by attribution only. The penalty Hamiltonian (`quantum/hamiltonian.py`) and the fault-tolerant oracle (`ft/oracle.py`) still encode the original five and raise `TypeError` for the others. `CountBound` and `AvgBound` have the same shape as `SectorCap` and `MinESG`, so extending the oracle to them is mechanical; the two risk caps are quadratic and would need new circuitry.
+- Constraint coverage on the quantum side:
+  - **Oracle** (`ft/oracle.py`): encodes `CountBound`, `AvgBound` and `LinearThreshold` since QA-2.
+  - **Not encodable:** `MinGroups`, `VolatilityCap` and `TrackingErrorCap` (not linear) still raise `TypeError`. That is why the example mandate's quantum numbers assume a hypothetical oracle.
+  - **Penalty Hamiltonian** (`quantum/hamiltonian.py`): still covers only the original five.
+- QAE numbers are noiseless simulations on synthetic data and count oracle queries, not wall-clock time. Never present them as a speedup (see the "must not say" list in `BUILD_PLAN.md` → "QA results").
 - Still `unmapped`: weighting schemes other than equal weight, targets that change over time, letter-rating scales, and anything the universe has no data for.
 - If a demo is re-run with other settings, the deck numbers (slides 4, 5, 9) must be updated by hand.
 - Deck slides in order: cover, problem, method, result, hard, sampler, routes, breakeven, backend, today, next.
@@ -44,7 +53,7 @@ Team #22 "FairBench" at the Hanken Quantum x Finance Hackathon (8–10 Oct 2026)
 
 **Problem (may pivot):** When an ESG fund underperforms, is it the manager or the ESG constraints? The approach is random-portfolio benchmarking: sample many portfolios that satisfy the *same* rules as the fund, build a null distribution of returns, and see where the real fund ranks. Classical constrained sampling can degrade as rule sets grow (MCMC gets trapped in islands; rejection-sampling acceptance falls).
 
-**Quantum contribution (as tested, see findings below):** Constraint-preserving circuits (Dicke state + XY mixer) that only produce portfolios with exactly k holdings, plus penalty or trained layers for the other constraints, plus a fault-tolerant amplitude-amplification (AA) roadmap. We benchmarked all three honestly against strong classical baselines; **none shows a speedup at the scales we could test**. The pitch must use the review-safe wording in this file, not "quadratic speedup".
+**Quantum contribution (as tested, see findings below):** constraint-preserving circuits (Dicke state + XY mixer) that only produce portfolios with exactly k holdings, penalty or trained layers, quantum-enhanced MCMC, amplitude amplification, and **quantum amplitude estimation of the attribution statistics**. The first four show no advantage against strong classical baselines. Amplitude estimation gives a quadratic *query* advantage on the fund percentile in noiseless simulation, and it stays robust where tight mandates fragment the feasible set. It is a fault-tolerant-era result: no advantage on today's hardware and no wall-clock advantage. The pitch must use the reviewed wording (`BUILD_PLAN.md` → "QA results"), never "quantum speedup".
 
 **AI layer:** a fund's policy text is translated by Claude into a structured rule spec, and deterministic code compiles that spec into the constraints the samplers use, reporting sentence by sentence what was enforced and what could not be.
 
@@ -60,7 +69,7 @@ Team #22 "FairBench" at the Hanken Quantum x Finance Hackathon (8–10 Oct 2026)
 | Training, post-processing, island instances, ablation, MPS sweep (P1) | Done, tested |
 | Quantum-enhanced MCMC study (Q) | Done — no quantum gain |
 | Amplitude-amplification fault-tolerant resource estimate (AA) | Done — no wall-clock advantage |
-| Quantum amplitude estimation of attribution statistics (QA) | Done on local branch `quantum-qae` (not pushed): quadratic query advantage in noiseless simulation, robust on fragmented mandates; no NISQ or wall-clock advantage |
+| Quantum amplitude estimation of attribution statistics (QA) | Done, on `main`: quadratic query advantage in noiseless simulation, robust on fragmented mandates; no NISQ or wall-clock advantage |
 | Attribution app `apps/attribution.py` (P2) | Done, tested (synthetic data only) |
 | AI mandate layer `mandate.py` + rule compiler `rules.py` (M) | Built, tested offline; **no live API call yet** |
 | Demos `scripts/demo_attribution.py`, `scripts/demo_mandate.py` | Done (`results/attribution_demo.*`, `attribution_samplers.csv`, `mandate_attribution.png`, `mandate_demo.json`) |
@@ -69,7 +78,7 @@ Team #22 "FairBench" at the Hanken Quantum x Finance Hackathon (8–10 Oct 2026)
 | Optimizer pivot `apps/optimizer.py` | Not started (2-line stub) |
 | Hardware runs (`ibm` / `vtt` backends) | Stubs that raise `NotImplementedError` |
 
-Test suite: **578 tests, all green** (~40 s), all offline.
+Test suite: **680 tests, all green** (~45 s), all offline.
 
 ### Key findings (use this wording in the pitch)
 
@@ -82,7 +91,7 @@ Test suite: **578 tests, all green** (~40 s), all offline.
 6. **Attribution (P2), synthetic data with planted ground truth:** n = 100, k = 20, three years of Gaussian returns with a planted rally in carbon-heavy names, fund planted at rank 70 of rule-abiding portfolios. Result: fund −3.4 pts vs benchmark = constraint effect −8.7 pts [95% MC CI −9.3, −8.3] + manager effect +5.4 pts; recovered percentile 69.3 ± 0.7. At n = 16 the Dicke circuit (`aer_statevector`, 14 qubits after exclusions), classical rejection and exact enumeration agree (percentile 67.5 / 68.5 / 68.3; KS p = 0.24). **No real fund has been analysed.**
 7. **AI mandate layer (M), one fictional mandate:** 18 rules = 14 enforced, 1 trivially satisfied, 3 reported as not expressible (yearly decarbonisation target, EU Taxonomy share, stewardship). The compiled rules exclude 58 of 150 assets and leave 0.54% of 20-name portfolios feasible. Attribution with them: −1.5 pts = constraint −6.3 + manager +4.8, percentile 70.4 ± 0.6 (planted 70). Pitch line: *"An AI layer reads the policy text; deterministic code turns it into constraints and shows what was enforced and what could not be. Tested on one fictional mandate, not on real fund documents, and not yet against the live API."*
 
-8. **Quantum amplitude estimation of the attribution (QA, branch `quantum-qae`, not pushed):** in noiseless simulation, amplitude estimation needs quadratically fewer queries for the attribution percentile (error ∝ queries^−1 vs ^−½). It does not depend on the feasible set being connected, which matters on fragmented tight mandates where swap-MCMC gets trapped. Percentile only: on the example mandate ~7–20× fewer queries than rejection at ±1 pp, assuming an oracle for all rules (two of them cannot be encoded). Whole attribution (percentile + both medians, classical warm start for the medians): ~2× fewer queries than rejection at P_F 3%, 4–16× on tighter rules, parity or a small loss on loose rules; 2–9× fewer than swap-MCMC. Noisy hardware: ~17k two-qubit gates per step at 16 assets, advantage needs error rates of order 1e-6. Fault-tolerant wall-clock: ≥ 8e3× slower at ±1 pp. Exact-counting DP is intractable with ≥ 3 weighted rules or overlapping group caps. Full numbers and the reviewed pitch paragraph: `BUILD_PLAN.md` → "QA results"; figure `results/qae_pitch_figure.png`; demo `scripts/demo_qae.py`. Pitch line: *"A fault-tolerant-era result we can quantify today, not a speedup on current or near-term hardware."*
+8. **Quantum amplitude estimation of the attribution (QA):** in noiseless simulation, amplitude estimation needs quadratically fewer queries for the attribution percentile (error ∝ queries^−1 vs ^−½). It does not depend on the feasible set being connected, which matters on fragmented tight mandates where swap-MCMC gets trapped. Percentile only: on the example mandate ~7–20× fewer queries than rejection at ±1 pp, assuming an oracle for all rules (two of them cannot be encoded). Whole attribution (percentile + both medians, classical warm start for the medians): ~2× fewer queries than rejection at P_F 3%, 4–16× on tighter rules, parity or a small loss on loose rules; 2–9× fewer than swap-MCMC. Noisy hardware: ~17k two-qubit gates per step at 16 assets, advantage needs error rates of order 1e-6. Fault-tolerant wall-clock: ≥ 8e3× slower at ±1 pp. Exact-counting DP is intractable with ≥ 3 weighted rules or overlapping group caps. Full numbers and the reviewed pitch paragraph: `BUILD_PLAN.md` → "QA results"; figure `results/qae_pitch_figure.png`; demo `scripts/demo_qae.py`. Pitch line: *"A fault-tolerant-era result we can quantify today, not a speedup on current or near-term hardware."*
 
 **Honest story for the pitch:** a constraint-preserving quantum sampler plus a careful benchmarking harness. Every speedup route was tested against fair classical baselines, and we report where the break-even would be. The practical tool (attribution) runs on classical rejection sampling today, with the quantum sampler as a drop-in backend.
 
@@ -94,10 +103,11 @@ Test suite: **578 tests, all green** (~40 s), all offline.
 git clone git@github.com:lalashutosh/FairBench.git && cd FairBench
 uv venv --python 3.11 .venv
 uv pip install -e ".[dev,ai]"                           # ai = Anthropic SDK, only needed for --live
-OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q        # 578 passed
+OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q        # 680 passed
 .venv/bin/python scripts/p0_demo.py                     # toy benchmark table
 .venv/bin/python scripts/demo_attribution.py            # pitch demo: attribution + sampler swap (~6 s)
 .venv/bin/python scripts/demo_mandate.py                # mandate text -> rules -> attribution (~15 s; --live calls Claude)
+.venv/bin/python scripts/demo_qae.py                    # quantum amplitude estimation vs classical, loose and tight rules (~2 s)
 ```
 
 ### ⚠️ Memory safety (read before running scripts)
@@ -132,9 +142,15 @@ fairbench/
     hamiltonian.py  penalty_operator, objective_operator (mean-variance QUBO for the optimizer pivot)
     proposal.py     quantum-enhanced MCMC proposal in the weight-k subspace
   ft/
-    oracle.py       reversible feasibility oracle + integer quantisation of ESG/carbon rules
+    oracle.py       reversible feasibility oracle; encodes caps, exclusions, CountBound, weighted rules (MinESG, CarbonCap,
+                    AvgBound, LinearThreshold); quantise modes superset/subset/minmis/auto
     revsim.py       fast classical simulator for reversible circuits
     resources.py    logical FT cost model: Dicke + oracle + reflection, known/BBHT/fixed-point schedules
+  qae/
+    estimators.py   amplitude estimation: IQAE, MLAE (LR CI), canonical AE, noisy model, iqae_amplitude_tol; exact query accounting
+    attribution_qae.py  percentile / quantile / whole-attribution estimators (hybrid median default), classical baselines
+    exact_count.py  exact-counting DP baseline (sector DP with brackets)
+    demo_bridge.py  attribute_qae: exact vs classical vs simulated quantum side by side
   apps/
     attribution.py  attribute() -> AttributionResult, rejection_sampler, dicke_sampler, plot_attribution
     optimizer.py    P2 — EMPTY STUB (pivot)
@@ -148,8 +164,17 @@ scripts/
   q_gap_sweep2.py   QeMCMC vs classical chains, exact spectral gaps (pre-registered protocol)
   aa_pf_scaling.py  feasible-fraction scaling n = 16..200
   aa_estimate.py    AA wall-clock vs classical, break-even plot
+  demo_qae.py       QAE pitch demo (loose + tight rules, errors vs exact, multi-rep reference)
+  qae_scaling.py    error vs queries, queries vs P_F, whole attribution, fair baselines
+  qae_hybrid.py     hybrid median + whole attribution at e50/e90 (200 reps)
+  qae_mandate.py    example mandate (full / encodable), rejection vs MCMC vs quantum
+  qae_noise.py      transpiled gate counts, noise model, NISQ thresholds
+  qae_breakeven.py  fault-tolerant wall-clock break-even
+  qae_dp_baseline.py  exact-counting DP vs sampling
+  qae_pitch_figure.py  slide figure from saved results
 results/            CSV/PNG/JSON outputs of all scripts (plots ready for slides: attribution_demo.png,
-                    ablation.png, mps_sweep.png, q2_gap.png, aa_pf_scaling.png, aa_breakeven.png)
+                    ablation.png, mps_sweep.png, q2_gap.png, aa_pf_scaling.png, aa_breakeven.png,
+                    qae_pitch_figure.png, qae_scaling.png, qae_hybrid.png, qae_noise.png, qae_breakeven.png)
 README.md           public-facing overview, quick start, usage example
 BUILD_PLAN.md       full execution log, per-wave results, review findings, pitch-safe wording
 ```
