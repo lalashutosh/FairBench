@@ -6,7 +6,7 @@
   "allowed_assets": 92,
   "n_rules": 18,
   "n_unmapped": 3,
-  "s_fund_buy_hold": 0.21989929486366444,
+  "s_fund_buy_hold": 0.21989929486366355,
   "planted_rank": 0.7,
   "planted_premium": 0.08,
   "mc_draws": 2000000,
@@ -81,100 +81,100 @@
           {
             "target": 0.1,
             "q95_abs_err": 0.03549380786678066,
-            "q_mean": 21524.0,
-            "q_median": 21150.0,
+            "q_mean": 23216.0,
+            "q_median": 22850.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.07,
             "q95_abs_err": 0.028497697486588237,
-            "q_mean": 31032.5,
-            "q_median": 34650.0,
+            "q_mean": 32790.5,
+            "q_median": 36450.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.05,
             "q95_abs_err": 0.0160670697867937,
-            "q_mean": 37110.5,
-            "q_median": 36350.0,
+            "q_mean": 38902.5,
+            "q_median": 38150.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.035,
             "q95_abs_err": 0.011587897354646989,
-            "q_mean": 47397.5,
-            "q_median": 37600.0,
+            "q_mean": 49210.0,
+            "q_median": 39400.0,
             "frac_within_target": 0.99,
             "reps": 200
           },
           {
             "target": 0.025,
             "q95_abs_err": 0.00948161413289962,
-            "q_mean": 74989.0,
-            "q_median": 43050.0,
+            "q_mean": 76846.0,
+            "q_median": 44850.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.018,
             "q95_abs_err": 0.006415437408786838,
-            "q_mean": 129159.5,
-            "q_median": 150600.0,
+            "q_mean": 131096.5,
+            "q_median": 152600.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.013,
             "q95_abs_err": 0.004609161032460068,
-            "q_mean": 157085.0,
-            "q_median": 163650.0,
+            "q_mean": 159059.0,
+            "q_median": 165650.0,
             "frac_within_target": 0.99,
             "reps": 200
           },
           {
             "target": 0.009,
             "q95_abs_err": 0.0027265986220675366,
-            "q_mean": 198448.5,
-            "q_median": 169500.0,
+            "q_mean": 200455.0,
+            "q_median": 171500.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.0065,
             "q95_abs_err": 0.0023420247281864415,
-            "q_mean": 264687.0,
-            "q_median": 176400.0,
+            "q_mean": 266721.0,
+            "q_median": 178400.0,
             "frac_within_target": 0.985,
             "reps": 200
           },
           {
             "target": 0.0045,
             "q95_abs_err": 0.0014659355686180145,
-            "q_mean": 476970.0,
-            "q_median": 487100.0,
+            "q_mean": 479074.0,
+            "q_median": 489200.0,
             "frac_within_target": 1.0,
             "reps": 200
           }
         ],
-        "kappa_q95": 705.112025187872,
+        "kappa_q95": 715.4578681284554,
         "table": {
           "0.02": {
-            "q_nominal_target": 113682.21428571428,
-            "q_matched_interp": 34658.966071178955,
-            "q_matched_fit_kappa": 35255.601259393596
+            "q_nominal_target": 115596.35714285713,
+            "q_matched_interp": 36443.05327471641,
+            "q_matched_fit_kappa": 35772.89340642277
           },
           "0.01": {
-            "q_nominal_target": 188107.625,
-            "q_matched_interp": 66394.04249400561,
-            "q_matched_fit_kappa": 70511.20251878719
+            "q_nominal_target": 190106.0,
+            "q_matched_interp": 68274.48915243945,
+            "q_matched_fit_kappa": 71545.78681284554
           },
           "0.005": {
-            "q_nominal_target": 423899.24999999994,
-            "q_matched_interp": 149695.92087595866,
-            "q_matched_fit_kappa": 141022.40503757438
+            "q_nominal_target": 425985.74999999994,
+            "q_matched_interp": 151666.54406964217,
+            "q_matched_fit_kappa": 143091.5736256911
           }
         }
       },
@@ -319,100 +319,100 @@
           {
             "target": 0.1,
             "q95_abs_err": 0.044226762139596996,
-            "q_mean": 18951.5,
-            "q_median": 18850.0,
+            "q_mean": 20632.5,
+            "q_median": 20550.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.07,
             "q95_abs_err": 0.026911499879174548,
-            "q_mean": 28044.5,
-            "q_median": 31400.0,
+            "q_mean": 29790.0,
+            "q_median": 33200.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.05,
             "q95_abs_err": 0.01731243567904014,
-            "q_mean": 32792.5,
-            "q_median": 32900.0,
+            "q_mean": 34572.0,
+            "q_median": 34700.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.035,
             "q95_abs_err": 0.010232065833381097,
-            "q_mean": 41648.5,
-            "q_median": 34500.0,
+            "q_mean": 43457.0,
+            "q_median": 36300.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.025,
             "q95_abs_err": 0.007775660217157295,
-            "q_mean": 68370.0,
-            "q_median": 44600.0,
+            "q_mean": 70226.5,
+            "q_median": 46400.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.018,
             "q95_abs_err": 0.006348564809511523,
-            "q_mean": 113528.0,
-            "q_median": 121600.0,
+            "q_mean": 115455.0,
+            "q_median": 123600.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.013,
             "q95_abs_err": 0.003755163122882305,
-            "q_mean": 144588.0,
-            "q_median": 149300.0,
+            "q_mean": 146560.5,
+            "q_median": 151300.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.009,
             "q95_abs_err": 0.0025001523229879023,
-            "q_mean": 167710.5,
-            "q_median": 153950.0,
+            "q_mean": 169707.0,
+            "q_median": 155950.0,
             "frac_within_target": 0.995,
             "reps": 200
           },
           {
             "target": 0.0065,
             "q95_abs_err": 0.0021691548860328976,
-            "q_mean": 235379.5,
-            "q_median": 168900.0,
+            "q_mean": 237409.5,
+            "q_median": 170900.0,
             "frac_within_target": 1.0,
             "reps": 200
           },
           {
             "target": 0.0045,
             "q95_abs_err": 0.0016858386350068586,
-            "q_mean": 419508.0,
-            "q_median": 413250.0,
+            "q_mean": 421601.5,
+            "q_median": 415350.0,
             "frac_within_target": 0.995,
             "reps": 200
           }
         ],
-        "kappa_q95": 555.3347863081153,
+        "kappa_q95": 574.4420555834839,
         "table": {
           "0.02": {
-            "q_nominal_target": 100625.71428571428,
-            "q_matched_interp": 31156.847038800464,
-            "q_matched_fit_kappa": 27766.739315405765
+            "q_nominal_target": 102532.57142857142,
+            "q_matched_interp": 32928.66503779709,
+            "q_matched_fit_kappa": 28722.102779174194
           },
           "0.01": {
-            "q_nominal_target": 161929.875,
-            "q_matched_interp": 43409.866313045124,
-            "q_matched_fit_kappa": 55533.47863081153
+            "q_nominal_target": 163920.375,
+            "q_matched_interp": 45235.40560411353,
+            "q_matched_fit_kappa": 57444.20555834839
           },
           "0.005": {
-            "q_nominal_target": 373475.87499999994,
-            "q_matched_interp": 126725.97471848878,
-            "q_matched_fit_kappa": 111066.95726162306
+            "q_nominal_target": 375553.49999999994,
+            "q_matched_interp": 128684.82602288372,
+            "q_matched_fit_kappa": 114888.41111669678
           }
         }
       },
@@ -525,13 +525,13 @@
       "rejection_proposals": 348550,
       "mcmc_queries": 81112.98895328319,
       "mcmc_extrapolated": false,
-      "quantum_nominal": 113682.21428571428,
-      "quantum_matched_interp": 34658.966071178955,
-      "quantum_matched_fit": 35255.601259393596,
-      "ratio_rej_over_q_min": 3.066002911625201,
-      "ratio_rej_over_q_max": 10.05656081269662,
-      "ratio_mcmc_over_q_min": 0.7135064131441372,
-      "ratio_mcmc_over_q_max": 2.340317619016731,
+      "quantum_nominal": 115596.35714285713,
+      "quantum_matched_interp": 36443.05327471641,
+      "quantum_matched_fit": 35772.89340642277,
+      "ratio_rej_over_q_min": 3.015233426164567,
+      "ratio_rej_over_q_max": 9.743410912839952,
+      "ratio_mcmc_over_q_min": 0.7016915667423805,
+      "ratio_mcmc_over_q_max": 2.2674427822134153,
       "rejection_frac_within_eps": 0.94625,
       "a_F": 0.0055415,
       "p": 0.7211043941171164
@@ -542,13 +542,13 @@
       "rejection_proposals": 1394199,
       "mcmc_queries": 335218.3297098177,
       "mcmc_extrapolated": true,
-      "quantum_nominal": 188107.625,
-      "quantum_matched_interp": 66394.04249400561,
-      "quantum_matched_fit": 70511.20251878719,
-      "ratio_rej_over_q_min": 7.411709121307549,
-      "ratio_rej_over_q_max": 20.998856940001435,
-      "ratio_mcmc_over_q_min": 1.7820560421716967,
-      "ratio_mcmc_over_q_max": 5.048921817647765,
+      "quantum_nominal": 190106.0,
+      "quantum_matched_interp": 68274.48915243945,
+      "quantum_matched_fit": 71545.78681284554,
+      "ratio_rej_over_q_min": 7.333797986386542,
+      "ratio_rej_over_q_max": 20.420496986614,
+      "ratio_mcmc_over_q_min": 1.763323249712359,
+      "ratio_mcmc_over_q_max": 4.9098621442829256,
       "rejection_frac_within_eps": 0.94475,
       "a_F": 0.0055415,
       "p": 0.7211043941171164
@@ -559,13 +559,13 @@
       "rejection_proposals": 5576795,
       "mcmc_queries": 1337331.9491740176,
       "mcmc_extrapolated": true,
-      "quantum_nominal": 423899.24999999994,
-      "quantum_matched_interp": 149695.92087595866,
-      "quantum_matched_fit": 141022.40503757438,
-      "ratio_rej_over_q_min": 13.155944484450021,
-      "ratio_rej_over_q_max": 39.545453777462555,
-      "ratio_mcmc_over_q_min": 3.154834430997502,
-      "ratio_mcmc_over_q_max": 9.483116876482821,
+      "quantum_nominal": 425985.74999999994,
+      "quantum_matched_interp": 151666.54406964217,
+      "quantum_matched_fit": 143091.5736256911,
+      "ratio_rej_over_q_min": 13.091505995212282,
+      "ratio_rej_over_q_max": 38.97360870870125,
+      "ratio_mcmc_over_q_min": 3.1393818905304176,
+      "ratio_mcmc_over_q_max": 9.345986736244189,
       "rejection_frac_within_eps": 0.948,
       "a_F": 0.0055415,
       "p": 0.7211043941171164
@@ -576,13 +576,13 @@
       "rejection_proposals": 287413,
       "mcmc_queries": 105517.10532137816,
       "mcmc_extrapolated": true,
-      "quantum_nominal": 100625.71428571428,
-      "quantum_matched_interp": 31156.847038800464,
-      "quantum_matched_fit": 27766.739315405765,
-      "ratio_rej_over_q_min": 2.8562579857463306,
-      "ratio_rej_over_q_max": 10.350981321041726,
-      "ratio_mcmc_over_q_min": 1.0486097521929174,
-      "ratio_mcmc_over_q_max": 3.8001259032541252,
+      "quantum_nominal": 102532.57142857142,
+      "quantum_matched_interp": 32928.66503779709,
+      "quantum_matched_fit": 28722.102779174194,
+      "ratio_rej_over_q_min": 2.803138514869143,
+      "ratio_rej_over_q_max": 10.006683779726506,
+      "ratio_mcmc_over_q_min": 1.0291081541331077,
+      "ratio_mcmc_over_q_max": 3.673724940427636,
       "rejection_frac_within_eps": 0.9485,
       "a_F": 0.0067965,
       "p": 0.7158831751636873
@@ -593,13 +593,13 @@
       "rejection_proposals": 1149651,
       "mcmc_queries": 418627.0176218622,
       "mcmc_extrapolated": true,
-      "quantum_nominal": 161929.875,
-      "quantum_matched_interp": 43409.866313045124,
-      "quantum_matched_fit": 55533.47863081153,
-      "ratio_rej_over_q_min": 7.099684354106986,
-      "ratio_rej_over_q_max": 26.483633736842854,
-      "ratio_mcmc_over_q_min": 2.585236464993641,
-      "ratio_mcmc_over_q_max": 9.64359149606642,
+      "quantum_nominal": 163920.375,
+      "quantum_matched_interp": 45235.40560411353,
+      "quantum_matched_fit": 57444.20555834839,
+      "ratio_rej_over_q_min": 7.013472242239563,
+      "ratio_rej_over_q_max": 25.41484893628223,
+      "ratio_mcmc_over_q_min": 2.553843703821823,
+      "ratio_mcmc_over_q_max": 9.254410611138498,
       "rejection_frac_within_eps": 0.946,
       "a_F": 0.0067965,
       "p": 0.7158831751636873
@@ -610,13 +610,13 @@
       "rejection_proposals": 4598604,
       "mcmc_queries": 1671066.6668237983,
       "mcmc_extrapolated": true,
-      "quantum_nominal": 373475.87499999994,
-      "quantum_matched_interp": 126725.97471848878,
-      "quantum_matched_fit": 111066.95726162306,
-      "ratio_rej_over_q_min": 12.312988087918667,
-      "ratio_rej_over_q_max": 41.40388926985537,
-      "ratio_mcmc_over_q_min": 4.474363081213207,
-      "ratio_mcmc_over_q_max": 15.045578883443506,
+      "quantum_nominal": 375553.49999999994,
+      "quantum_matched_interp": 128684.82602288372,
+      "quantum_matched_fit": 114888.41111669678,
+      "ratio_rej_over_q_min": 12.24487057103715,
+      "ratio_rej_over_q_max": 40.02670030251365,
+      "ratio_mcmc_over_q_min": 4.449610153610068,
+      "ratio_mcmc_over_q_max": 14.5451281863967,
       "rejection_frac_within_eps": 0.9465,
       "a_F": 0.0067965,
       "p": 0.7158831751636873
@@ -633,5 +633,5 @@
     "MCMC: uniform target on F, one query = one proposed swap + feasibility check; chains start from rejection-found feasible states (these are exact stationary draws, so burn-in is not needed for correctness; BURN=1000 is charged anyway as practitioners cannot know this); error is measured over independent chains. 'extrapolated' entries use q95 = c/sqrt(L) fitted at L>=2000. MCMC accuracy depends on mixing (tau estimate reported) and needs a connected feasible set under swaps.",
     "Not considered: classical exact-counting DP, stratified/importance sampling, which could change the classical side."
   ],
-  "runtime_s": 334.0621657371521
+  "runtime_s": 335.51030230522156
 }

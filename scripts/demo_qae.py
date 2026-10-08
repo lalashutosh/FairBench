@@ -72,14 +72,15 @@ def run(n=16, k=5, seed=0, years=3.0, premium=0.08, rank=0.70, eps=0.01, method=
                 premium=premium, planted_rank=rank, results=res, details=det)
 
 
-def scaling_ref(pf, tol="0.01"):
-    """whole-attribution required-query numbers (multi-rep, median error) from
-    results/qae_hybrid.json (hybrid median, the qae_attribute default), closest P_F."""
+def scaling_ref(pf):
+    """whole-attribution required queries at tol 0.01 (multi-rep, 200 reps) from
+    results/qae_hybrid.json (hybrid median, the qae_attribute default), closest P_F:
+    (P_F, {criterion: (rejection, quantum_hybrid, mcmc)}) for e50 (typical run) and e90."""
     try:
         cases = json.loads((RES / "qae_hybrid.json").read_text())["cases"]
         c = min(cases, key=lambda c: abs(np.log(c["P_F"] / pf)))
-        w = c["whole"]
-        return c["P_F"], w["rejection"], w["quantum_hybrid"], w.get("mcmc")
+        return c["P_F"], {k: (c[k]["whole"]["rejection"], c[k]["whole"]["quantum_hybrid"],
+                              c[k]["whole"].get("mcmc")) for k in ("e50", "e90")}
     except Exception:
         return None
 
@@ -108,10 +109,14 @@ def show(out, method):
           f"with errors above -- compare rows, single run")
     ref = scaling_ref(d["P_F"])
     if ref:
-        mc = f", swap-MCMC {ref[3]:,.0f}" if ref[3] else ""
-        print(f"  single run; multi-rep required queries for the whole attribution at tol 0.01 (median error, "
-              f"closest P_F={ref[0]:.4f}, results/qae_hybrid.json): rejection {ref[1]:,.0f}{mc} vs "
-              f"quantum (hybrid median) {ref[2]:,.0f} ({ref[1] / ref[2]:.1f}x vs rejection)")
+        pf, t = ref
+        for crit, lab in (("e50", "typical run"), ("e90", "9 in 10 runs")):
+            rj, qh, mc = t[crit]
+            if not (rj and qh):
+                continue
+            mcs = f", swap-MCMC {mc:,.0f}" if mc else ""
+            print(f"  multi-rep, whole attribution at ±1 pt ({lab}, closest P_F={pf:.4f}): rejection {rj:,.0f}"
+                  f"{mcs} vs quantum {qh:,.0f} queries ({rj / qh:.2f}x vs rejection)")
     else:
         print("  single run; see results/qae_hybrid.json for the multi-rep required-query comparison")
     po = d["percentile_only"]

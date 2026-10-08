@@ -296,14 +296,22 @@ Measured. Unless stated otherwise: noiseless simulation, exact amplitudes, and a
    - Queries ∝ P_F^−0.41…−0.56 (quantum) vs P_F^−1.17 (rejection) vs P_F^−0.54 (swap-MCMC on connected sets).
    - **IQAE is the robust method.** Its 95th-percentile error reaches ±1 pp on all tight cases. MLAE's median looks better, but its error tail does not reach ±1 pp at P_F ≤ 0.0072.
    - Exhaustive enumeration (C = 7.5e4) beats all samplers at the 95% level at these small n.
-3. **Whole attribution (percentile + null median + benchmark median), tol 0.01.** Classical uses one shared sample set.
-   - Loose rules (P_F ≥ 0.03): rejection needs fewer queries (rejection/quantum 0.48–0.62).
-   - Tight rules (P_F ≤ 0.007): quantum needs 1.75–4.9× fewer than rejection, and 0.8–1.8× vs MCMC (it loses at P_F 0.72%).
-   - The medians are the weak spot: bisection takes about 14 AE runs.
+3. **Whole attribution (percentile + null median + benchmark median), tol 0.01.**
+   - Classical uses one shared sample set. The quantum medians use the hybrid estimator (QA-10/11): about 10 feasible classical samples (charged) give an empirical CDF, then amplitude-estimation refinement on a monotone (isotonic) fit, with a charged bisection fallback. At least 98.5% of runs converge.
+   - Accounting: every shot costs m+1 queries (QA-11).
+   - Rejection/quantum queries, by feasible fraction:
+
+     | P_F | 0.36 | 0.097 | 0.034 | 0.0072 | 0.0023 |
+     |---|---|---|---|---|---|
+     | typical run (e50) | 0.65 | 1.14 | 2.35 | 4.1 | 12.2 |
+     | 9 in 10 runs (e90) | 0.97 | 1.74 | 3.1 | 6.9 | 15.6 |
+
+   - Vs swap-MCMC (e50): 2.2–8.5× fewer. MCMC never reaches e90 ±1 pt for the median.
+   - Source: 200 reps, regression crossings; results/qae_hybrid.json. Queries ∝ P_F^−0.44 (quantum) vs P_F^−0.93 (rejection).
 4. **Fragmentation:** at P_F ≤ 0.0023 the swap graph of F splits into 14–19 components, and MCMC chains get trapped (90th-percentile percentile error 0.26–0.44). AE needs no connectivity.
 5. **Example mandate (QA-F3, n=150, k=20; percentile only, ±1 pp).**
-   - Full mandate (P_F 0.55%): about 7–21× fewer queries than rejection and 1.8–5× fewer than MCMC. This assumes a hypothetical oracle: TrackingErrorCap (quadratic) and MinGroups cannot be encoded.
-   - Encodable sub-mandate (P_F 0.68%): 7–26× vs rejection and 2.6–9.6× vs MCMC. Its oracle is 2.6e4 Toffoli and 391 logical qubits.
+   - Full mandate (P_F 0.55%): about 7–20× fewer queries than rejection and 1.8–5× fewer than MCMC. This assumes a hypothetical oracle: TrackingErrorCap (quadratic) and MinGroups cannot be encoded.
+   - Encodable sub-mandate (P_F 0.68%): 7–25× vs rejection and 2.6–9.3× vs MCMC. Its oracle is 2.6e4 Toffoli and 391 logical qubits.
    - Each range runs from the nominal-target cost to the matched-95%-error cost. The MCMC figures are partly extrapolated in chain length.
    - The 8-bit oracle's quantisation bias on the mandate was not measured.
 6. **NISQ (QA-4).**
@@ -322,7 +330,7 @@ Measured. Unless stated otherwise: noiseless simulation, exact amplitudes, and a
 Demo: `scripts/demo_qae.py` (about 2 s) runs a loose and a tight instance. It prints errors vs exact and the multi-rep reference: rejection wins on loose rules, and quantum needs about 4× fewer queries on tight ones. Pitch figure: `results/qae_pitch_figure.png`.
 
 **Pitch wording (final, reviewed):**
-> *"The attribution percentile is a ratio of two amplitudes. In noiseless simulation on synthetic data, quantum amplitude estimation over our constraint-preserving circuit reaches a given percentile precision with quadratically fewer oracle queries than classical sampling (error ∝ 1/queries vs 1/√queries). Against rejection sampling the gap widens as mandates tighten. On the tightest rule sets the feasible portfolios split into disconnected islands that trap swap-MCMC; amplitude estimation does not depend on that connectivity. On the example mandate, assuming an oracle for all of its rules, the percentile needs roughly 7–21× fewer queries than rejection sampling at ±1 percentile point. For the full attribution (percentile plus both medians) the gain is 2–5× over rejection, and only on tight rules. It is a fault-tolerant-era result: on today's noisy devices the circuit (~17k two-qubit gates per step at 16 assets) would need two-qubit error rates of order 1e-6 for any advantage, and even fault-tolerant wall-clock time does not beat a laptop at analyst precision."*
+> *"The attribution percentile is a ratio of two amplitudes. In noiseless simulation on synthetic data, quantum amplitude estimation over our constraint-preserving circuit reaches a given percentile precision with quadratically fewer oracle queries than classical sampling (error ∝ 1/queries vs 1/√queries). Against rejection sampling the gap widens as mandates tighten. On the tightest rule sets the feasible portfolios split into disconnected islands that trap swap-MCMC; amplitude estimation does not depend on that connectivity. On the example mandate, assuming an oracle for all of its rules, the percentile needs roughly 7–20× fewer queries than rejection sampling at ±1 percentile point. For the full attribution (percentile plus both medians, with a classical warm start for the medians) the gain is about 2× at a 3% feasible fraction and 4–16× on tighter rules (parity or a small loss on loose rules), and 2–9× over swap-MCMC. It is a fault-tolerant-era result: on today's noisy devices the circuit (~17k two-qubit gates per step at 16 assets) would need two-qubit error rates of order 1e-6 for any advantage, and even fault-tolerant wall-clock time does not beat a laptop at analyst precision."*
 
 Must not say:
 - "quantum speedup for attribution";
@@ -330,4 +338,4 @@ Must not say:
 - any ε* break-even number;
 - a single "N×" figure without its range and its percentile-only scope.
 
-Open: quantum-walk (Szegedy/Montanaro) speedup of MCMC not explored; hybrid classical-warm-start median (QA-10) in progress.
+Open: quantum-walk (Szegedy/Montanaro) speedup of MCMC not explored. Accounting since QA-11: a shot after m iterates costs m+1 queries; all qae_* results regenerated 2026-10-08 08:40–08:53.

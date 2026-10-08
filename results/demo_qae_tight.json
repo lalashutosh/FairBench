@@ -26,19 +26,19 @@
     },
     "quantum": {
       "percentile": 69.49379418106778,
-      "null_median": 0.26783618739933046,
-      "benchmark_median": 0.23196114675278082,
-      "constraint_effect": 0.035875040646549644,
-      "manager_effect": 0.11695060354127884,
-      "queries": 577230
+      "null_median": 0.2665092568408218,
+      "benchmark_median": 0.24192774971683248,
+      "constraint_effect": 0.024581507123989293,
+      "manager_effect": 0.11827753409978753,
+      "queries": 547630
     },
     "classical_matched": {
-      "percentile": 68.66666666666667,
+      "percentile": 68.00535475234271,
       "null_median": 0.27452764086589965,
-      "benchmark_median": 0.23735458686259592,
-      "constraint_effect": 0.03717305400330373,
+      "benchmark_median": 0.23593857089424297,
+      "constraint_effect": 0.038589069971656675,
       "manager_effect": 0.11025915007470966,
-      "queries": 309710
+      "queries": 311210
     }
   },
   "details": {
@@ -48,27 +48,27 @@
     "fund_return": 0.3847867909406093,
     "n_samples": 5000,
     "quantum_queries": {
-      "percentile": 306500,
-      "null_median": 267520,
-      "benchmark_median": 3210,
-      "total": 577230
+      "percentile": 308100,
+      "null_median": 236420,
+      "benchmark_median": 3110,
+      "total": 547630
     },
     "classical_matched_queries": {
-      "shared_set": 306500,
-      "benchmark": 3210,
-      "total": 309710,
-      "separate_sets_total": 577230
+      "shared_set": 308100,
+      "benchmark": 3110,
+      "total": 311210,
+      "separate_sets_total": 547630
     },
     "classical_cost_unit": "proposals",
     "classical_cost_raw": 2227619,
     "units": "percentile 0-100; medians/effects as total-return fractions",
     "P_F": 0.00227842333105491,
     "percentile_only": {
-      "quantum_queries": 306500,
+      "quantum_queries": 308100,
       "classical_queries": 3579854,
       "classical_basis": "analytic: z^2 p(1-p)/(eps^2 P_F) rejection proposals"
     },
     "regime": "tight"
   },
-  "runtime_s": 1.64
+  "runtime_s": 1.66
 }

@@ -26,19 +26,19 @@
     },
     "quantum": {
       "percentile": 61.33128796300683,
-      "null_median": 0.08122293131671661,
-      "benchmark_median": 0.28216976504036984,
-      "constraint_effect": -0.20094683372365324,
-      "manager_effect": 0.03507935400340749,
-      "queries": 106901
+      "null_median": 0.0825117307820566,
+      "benchmark_median": 0.2826020480710526,
+      "constraint_effect": -0.200090317288996,
+      "manager_effect": 0.033790554538067494,
+      "queries": 142201
     },
     "classical_matched": {
-      "percentile": 60.57786483839374,
+      "percentile": 59.971374045801525,
       "null_median": 0.08093342194081288,
-      "benchmark_median": 0.28008047084372345,
-      "constraint_effect": -0.19914704890291057,
+      "benchmark_median": 0.27730173436355554,
+      "constraint_effect": -0.19636831242274266,
       "manager_effect": 0.03536886337931122,
-      "queries": 86710
+      "queries": 89110
     }
   },
   "details": {
@@ -48,23 +48,23 @@
     "fund_return": 0.1163022853201241,
     "n_samples": 5000,
     "quantum_queries": {
-      "percentile": 82800,
-      "null_median": 20191,
-      "benchmark_median": 3910,
-      "total": 106901
+      "percentile": 84300,
+      "null_median": 53091,
+      "benchmark_median": 4810,
+      "total": 142201
     },
     "classical_matched_queries": {
-      "shared_set": 82800,
-      "benchmark": 3910,
-      "total": 86710,
-      "separate_sets_total": 106901
+      "shared_set": 84300,
+      "benchmark": 4810,
+      "total": 89110,
+      "separate_sets_total": 142201
     },
     "classical_cost_unit": "proposals",
     "classical_cost_raw": 70000,
     "units": "percentile 0-100; medians/effects as total-return fractions",
     "P_F": 0.07492507492507493,
     "percentile_only": {
-      "quantum_queries": 82800,
+      "quantum_queries": 84300,
       "classical_queries": 121596,
       "classical_basis": "analytic: z^2 p(1-p)/(eps^2 P_F) rejection proposals"
     },

@@ -223,9 +223,9 @@ extra = [Line2D([0], [0], color=C_MCMC, marker="*", ms=14, mfc="white", mew=2.2,
 axR.legend(handles=extra, loc="lower right", frameon=False, fontsize=11)
 
 # Footer
-footer = ("Noiseless simulation, synthetic data; query = one oracle call. Percentile shown; full attribution "
-          "(percentile + medians) gains 2–5x over rejection and only on tight rules (vs MCMC 0.8–1.8x). "
-          "Not a wall-clock speedup: no advantage on noisy hardware; fault-tolerant wall-clock slower at analyst precision.")
+footer = ("Noiseless simulation, synthetic data; query = one oracle call. Full attribution (percentile + both medians): "
+          "parity with rejection on loose rules, 2–16x fewer queries at P_F ≤ 3%, 2–9x fewer than MCMC. "
+          "No advantage on noisy hardware; fault-tolerant wall-clock slower at analyst precision.")
 fig.text(0.5, 0.03, "\n".join(textwrap.wrap(footer, 165)), fontsize=11, color="#444444",
          ha="center", va="center")
 
