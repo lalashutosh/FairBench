@@ -197,3 +197,42 @@ def test_qae_attribute_median_method_switch(case):
     assert b.details["null_median"].details["method"] == "iqae"
     with pytest.raises(ValueError):
         qae_attribute(u, cs, fund, median_method="nope")
+
+
+# ------------------------------------------------------------------ QA-11: hybrid convergence
+def test_isotonic_weighted_pava():
+    from fairbench.qae.attribution_qae import _isotonic
+    x = np.array([0.3, 0.1, 0.2, 0.4])
+    y = np.array([0.2, 0.1, 0.5, 0.6])          # violator between x=0.2 (0.5) and x=0.3 (0.2)
+    w = np.array([1.0, 1.0, 3.0, 1.0])
+    f = _isotonic(x, y, w)
+    np.testing.assert_allclose(f, [0.425, 0.1, 0.425, 0.6])
+    assert np.all(np.diff(f[np.argsort(x)]) >= 0)
+
+
+def test_hybrid_converges_and_tail_shrinks(case):
+    """Monotone (isotonic, 1/h^2) rank fit + charged bisection fallback: (almost) every run
+    converges (last h <= eps and |q - r_last| <= eps), the e90 rank error is ~eps (it shrank
+    with eps: the old offset interpolation stalled ~10-30% of runs at 0.03-0.07), the returned
+    ci is a real CI (covers the exact median), and the fallback queries are charged."""
+    u, cs, fund, inst = case
+    ib = ExactInstance.build(u, cs, cardinality_only=True)          # |F| = 4368 (no floor)
+    e90 = {}
+    for eps in (0.03, 0.01):
+        rng = np.random.default_rng(123)
+        rs = [qae_quantile_hybrid(u, cs, 0.5, eps, 10, rng=rng, inst=ib, oracle_kind="ideal")
+              for _ in range(150)]
+        conv = np.mean([r.details["converged"] for r in rs])
+        assert conv >= 0.97, (eps, conv)
+        errs = np.array([r.details["rank_error"] for r in rs])
+        e90[eps] = np.quantile(errs, 0.9)
+        cov = np.mean([r.ci[0] <= ib.quantile(0.5) <= r.ci[1] for r in rs])
+        assert cov >= 0.85, (eps, cov)
+        for r in rs:
+            d = r.details
+            assert r.oracle_queries == d["classical_queries"] + d["aF_queries"] + sum(st[3] for st in d["steps"])
+            assert d["n_iter"] == d["n_main"] + d["n_fallback"]
+            if d["converged"]:
+                assert d["last_h"] <= eps * (1 + 1e-9) and abs(d["last_rank_measured"] - 0.5) <= eps
+    assert e90[0.01] <= 0.015, e90
+    assert e90[0.01] < 0.6 * e90[0.03], e90

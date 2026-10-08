@@ -80,12 +80,14 @@ def test_ci_coverage(a):
 
 # ------------------------------------------------------------------ 3. scaling
 def test_error_scaling_slopes():
+    # budgets span >= 2 decades of oracle_queries = sum shots (m+1) (QA-11 convention; the
+    # +1 per shot inflates small budgets, so the IQAE / MLAE windows reach one step deeper)
     a, reps = 0.07, 30
     rng = np.random.default_rng(11)
     o = IdealOracle(a)
     s_mc = _slope(lambda b, g: classical_mc(o, b, g), [100, 1000, 10_000, 100_000], a, reps, rng)
-    s_iq = _slope(lambda b, g: iqae(o, b, 0.05, g), [1e-2, 3e-3, 1e-3, 3e-4, 1e-4], a, reps, rng)
-    s_ml = _slope(lambda b, g: mlae(o, exp_schedule(b), 100, g), range(4, 12), a, reps, rng)
+    s_iq = _slope(lambda b, g: iqae(o, b, 0.05, g), [1e-2, 3e-3, 1e-3, 3e-4, 1e-4, 3e-5], a, reps, rng)
+    s_ml = _slope(lambda b, g: mlae(o, exp_schedule(b), 100, g), range(4, 13), a, reps, rng)
     assert -0.6 <= s_mc <= -0.4, s_mc
     assert -1.15 <= s_iq <= -0.8, s_iq
     assert -1.15 <= s_ml <= -0.8, s_ml
@@ -116,16 +118,25 @@ def test_query_accounting_exact():
     rng = np.random.default_rng(0)
     o = IdealOracle(0.2)
     r = mlae(o, [0, 1, 3, 3, 8], [10, 20, 30, 5, 7], rng)
-    assert r.oracle_queries == 0 * 10 + 1 * 20 + 3 * 30 + 3 * 5 + 8 * 7
+    # every shot = m Grover oracle calls + 1 final evaluation of the measured string
+    assert r.oracle_queries == 1 * 10 + 2 * 20 + 4 * 30 + 4 * 5 + 9 * 7
+    assert r.extra["grover_calls"] == 0 * 10 + 1 * 20 + 3 * 30 + 3 * 5 + 8 * 7
     assert r.state_preps == 1 * 10 + 3 * 20 + 7 * 30 + 7 * 5 + 17 * 7
     assert r.shots == 72
     assert [(m, n) for m, n, _ in r.schedule] == [(0, 10), (1, 20), (3, 30), (3, 5), (8, 7)]
     r = classical_mc(o, 1234, rng)
     assert (r.oracle_queries, r.state_preps, r.shots) == (1234, 1234, 1234)
+    assert r.extra["grover_calls"] == 0
+    # m = 0 shots cost one query each, exactly like a classical sample
+    r0 = mlae(o, [0], 500, rng)
+    assert r0.oracle_queries == 500 and r0.extra["grover_calls"] == 0
     r = canonical_ae(o, 5, 3, rng)
-    assert r.oracle_queries == 3 * 31 and r.state_preps == 3 * 63
+    assert r.oracle_queries == 3 * 32 and r.state_preps == 3 * 63
+    assert r.extra["grover_calls"] == 3 * 31
     r = iqae(o, 1e-3, 0.05, rng)
-    assert r.oracle_queries == sum(m * n for m, n, _ in r.schedule)
+    assert r.oracle_queries == sum((m + 1) * n for m, n, _ in r.schedule)
+    assert r.extra["grover_calls"] == sum(m * n for m, n, _ in r.schedule)
+    assert r.oracle_queries == r.extra["grover_calls"] + r.shots
     assert r.state_preps == sum((2 * m + 1) * n for m, n, _ in r.schedule)
     assert r.shots == sum(n for _, n, _ in r.schedule)
 
@@ -153,6 +164,7 @@ def test_ratio_estimate_subspace():
     assert abs(r.estimate - true) < 0.01
     assert r.oracle_queries == rn.oracle_queries + rd.oracle_queries
     assert r.state_preps == rn.state_preps + rd.state_preps
+    assert r.extra["grover_calls"] == rn.extra["grover_calls"] + rd.extra["grover_calls"]
 
 
 # ------------------------------------------------------------------ QA-F2 additions
@@ -210,11 +222,14 @@ def test_iqae_amplitude_tol_accounting_and_coverage():
         assert ok / reps >= 0.93, (a, ok / reps)
         pq = r.extra["pilot_queries"]
         assert pq > 0 and pq < r.oracle_queries
-        main_q = sum(m * n for m, n, _ in r.schedule)
+        main_q = sum((m + 1) * n for m, n, _ in r.schedule)
         # result schedule is main run only; totals include pilot
         assert r.oracle_queries == main_q + pq
         assert r.shots == sum(n for _, n, _ in r.schedule) + r.extra["pilot_shots"]
         assert r.state_preps == (sum((2 * m + 1) * n for m, n, _ in r.schedule)
                                  + r.extra["pilot_state_preps"])
+        assert r.extra["grover_calls"] == (sum(m * n for m, n, _ in r.schedule)
+                                           + r.extra["pilot_grover_calls"])
+        assert r.oracle_queries == r.extra["grover_calls"] + r.shots
     r0 = iqae_amplitude_tol(IdealOracle(0.1), 0.01, 0.05, rng, pilot=False)
     assert r0.extra["pilot_queries"] == 0

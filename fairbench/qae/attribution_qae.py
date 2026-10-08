@@ -336,35 +336,68 @@ def _ae_to_halfwidth(oracle, eps_a: float, a_guess: float, rng, alpha: float = 0
     return mlae(oracle, sched, mlae_shots, rng, conf=1 - alpha)
 
 
+def _isotonic(x: np.ndarray, y: np.ndarray, w: np.ndarray) -> np.ndarray:
+    """Weighted isotonic (non-decreasing) least-squares fit of y on sorted x (pool adjacent
+    violators). Returns fitted values in the order of x."""
+    o = np.argsort(x, kind="stable")
+    vals, wts, cnt = [], [], []
+    for yi, wi in zip(np.asarray(y, float)[o], np.asarray(w, float)[o]):
+        vals.append(yi); wts.append(wi); cnt.append(1)
+        while len(vals) > 1 and vals[-2] > vals[-1]:
+            v2, w2, c2 = vals.pop(), wts.pop(), cnt.pop()
+            vals[-1] = (vals[-1] * wts[-1] + v2 * w2) / (wts[-1] + w2)
+            wts[-1] += w2; cnt[-1] += c2
+    fit_sorted = np.repeat(vals, cnt)
+    out = np.empty(len(fit_sorted)); out[o] = fit_sorted
+    return out
+
+
 def qae_quantile_hybrid(u: Universe, cs: ConstraintSet, q: float = 0.5, eps: float = 0.01,
                         m0: int = 40, alpha: float = 0.05, shrink: float = 0.5, max_iter: int = 12,
                         rng: np.random.Generator | None = None, cardinality_only: bool = False,
                         inst: ExactInstance | None = None, oracle_kind: str = "auto",
                         rel_F: float | None = None, n_shots: int = 100,
-                        ae: str = "iqae", mlae_shots: int = 30, aF_run: AEResult | None = None) -> QAEResult:
-    """Hybrid classical/quantum q-quantile (default q = 1/2): warm-started rank-correction iteration.
+                        ae: str = "iqae", mlae_shots: int = 30, aF_run: AEResult | None = None,
+                        max_fallback: int | None = None) -> QAEResult:
+    """Hybrid classical/quantum q-quantile (default q = 1/2): warm-started monotone rank-curve
+    root finding, with a charged bisection fallback.
 
     1. CLASSICAL WARM START (charged): propose uniform weight-k subsets until ``m0`` feasible ones
        are seen (N0 ~ m0 / P_F proposals; ``cardinality_only``: N0 = m0). Their sorted scores give a
-       piecewise-linear empirical CDF F0 (rank of a threshold s) and quantile function QF0.
+       piecewise-linear empirical CDF F0 and quantile function QF0; thresholds are parametrised by
+       their empirical rank t = F0(s) (s = QF0(t)).
     2. a_F by IQAE to relative precision ``rel_F`` (default eps), unless ``aF_run`` (a finished
        a_F AE run, e.g. the percentile's) is supplied -- then it is reused and NOT charged again.
-    3. Rank-correction loop: s_t = QF0(p_t); ONE AE of a_G(s_t) to rank half-width
-       h_t = max(eps, shrink * gap_{t-1}) (gap_0 = 1/sqrt(m0) ~ 2 sd of the empirical rank error;
-       the amplitude precision is warm-started from the classical a_G guess, so no AE pilot).
-       Measured rank r_t = a_G/a_F -> p_{t+1} = F0(s_t) + (q - r_t): the empirical CDF supplies the
-       local SHAPE, the AE supplies the exact rank OFFSET. Stops after the run with h_t = eps; the
-       returned estimate is QF0(p_final) (a last shift using that run's measured offset).
-    Cost = N0 + a_F + sum_t cost(h_t) ~ m0/P_F + geometric series ending in ONE AE at rank precision eps
-    (vs ~14 sequential sequential-test AE runs for bisection). Unlike bisection, the answer is a
-    point estimate, not a guaranteed bracket; its rank error is ~ eps/1.96 + second-order terms."""
+    3. Root-finding loop (at most ``max_iter`` AE runs): at t_1 = q, then at the current root,
+       ONE AE of a_G(QF0(t)) to rank half-width h = max(eps, shrink * gap) (gap_0 = 1/sqrt(m0);
+       gap = |q - r| + h/2 after each run; amplitude precision warm-started from the classical
+       a_G guess, no AE pilot). Measured ranks r_j = a_G/a_F at t_j are fitted by a MONOTONE
+       (non-decreasing) rank curve: weighted isotonic regression of r_j on t_j with weights 1/h_j^2
+       plus the exact anchors r(0) = 0, r(1) = 1, linearly interpolated. The next t is the root of
+       fit(t) = q, clipped to the open bracket of measured thresholds whose rank CI excludes q
+       (largest t with CI above-below q, smallest with CI wholly above). Coarse early points
+       therefore cannot drag the root (the old offset interpolation through all points was
+       non-monotone and stalled ~10% of runs at rank error 0.03-0.07).
+       CONVERGED when the last run had h <= eps and |q - r_last| <= eps.
+    4. FALLBACK (only if not converged after ``max_iter`` runs): charged bisection in t between the
+       CI bracket, one AE at h = eps per step, until converged or ``max_fallback`` steps
+       (default 2 ceil(log2(1/eps)) + 4) or the bracket collapses below score resolution.
+    Estimate: converged -> QF0(root of the monotone fit) (a final shift of <= ~eps rank using the
+    measured precise points), clipped to the CI bracket; otherwise the measured threshold whose
+    rank is closest to q among the precise runs.
+    ``ci``: a genuine confidence interval for the quantile: (s_lo, s_hi) = the bracketing measured
+    thresholds whose rank CI (a_G CI over the a_F CI) lies wholly below / above q (data-only score
+    bounds if none). Coverage >= 1 - 3 alpha (two a_G CIs and the a_F CI, union bound; a_F CI
+    ignored when cardinality_only). ``details['rank_band']`` is the old (QF0(t-eps), QF0(t+eps))
+    band (NOT a confidence interval).
+    Cost = N0 + a_F + sum of all AE runs (main loop + fallback); all charged."""
     rng = rng or np.random.default_rng(0)
     inst = inst or ExactInstance.build(u, cs, cardinality_only)
     cardinality_only = bool(np.all(inst.feasible))
     sf = inst._sf
     q_total, aF_q = 0, 0
     if cardinality_only:
-        N0, aF = int(m0), 1.0
+        N0, aF, aF_lo, aF_hi = int(m0), 1.0, 1.0, 1.0
     else:
         N0 = int(m0 + rng.negative_binomial(m0, inst.a_F))
         if aF_run is not None:
@@ -382,62 +415,114 @@ def qae_quantile_hybrid(u: Universe, cs: ConstraintSet, q: float = 0.5, eps: flo
                 aF_q = rF.oracle_queries
         aF = rF.estimate
         if aF <= 0:
-            return QAEResult(float("nan"), (float("nan"),) * 2, N0 + aF_q, dict(failed="a_F=0"))
+            return QAEResult(float("nan"), (float("nan"),) * 2, N0 + aF_q,
+                             dict(failed="a_F=0", converged=False))
+        aF_lo, aF_hi = max(rF.ci[0], 1e-15), max(rF.ci[1], aF)
     q_total = N0 + aF_q
     x = np.sort(sf[rng.integers(len(sf), size=int(m0))])
     lo, hi = inst.score_range()
     pad = 1e-9 + 1e-6 * (hi - lo)
-    xk = np.concatenate([[min(lo - pad, x[0] - pad)], x, [max(hi + pad, x[-1] + pad)]])
+    s_min, s_max = min(lo - pad, x[0] - pad), max(hi + pad, x[-1] + pad)
+    xk = np.concatenate([[s_min], x, [s_max]])
     pk = np.concatenate([[0.0], (np.arange(len(x)) + 0.5) / len(x), [1.0]])
     F0 = lambda s: float(np.interp(s, xk, pk))
     QF0 = lambda p: float(np.interp(min(max(p, 0.0), 1.0), pk, xk))
-    p_t, gap, steps = q, 1.0 / math.sqrt(m0), []
-    ts, ds = [], []                       # measured offsets delta_j = r_j - t_j at empirical ranks t_j
+    steps, runs_t = [], []       # runs_t: (t, r, h, r_ci_lo, r_ci_hi)
+    br = [0.0, 1.0]              # t-bracket from rank CIs excluding q
 
-    def solve_t():
-        """root of g(t) = t + delta(t) - q on [0, 1], delta = piecewise-linear through the
-        measured offsets (constant beyond the end points); bisection."""
-        if not ts:
-            return q
-        o = np.argsort(ts)
-        tt, dd = np.asarray(ts)[o], np.asarray(ds)[o]
-        g = lambda t: t + float(np.interp(t, tt, dd)) - q
-        a_, b_ = 0.0, 1.0
-        if g(a_) >= 0:
-            return a_
-        if g(b_) <= 0:
-            return b_
-        for _ in range(60):
-            m_ = 0.5 * (a_ + b_)
-            if g(m_) < 0:
-                a_ = m_
-            else:
-                b_ = m_
-        return 0.5 * (a_ + b_)
-
-    for _ in range(max_iter):
-        s = QF0(p_t)
-        h = max(eps, shrink * gap)
+    def measure(t, h):
+        nonlocal q_total
+        s = QF0(t)
         eps_a = h * aF
         a_g = max(min(0.5, aF * (q + gap)), eps_a / 2)
         r = _ae_to_halfwidth(make_oracle(inst.mask_below(s), oracle_kind), eps_a, a_g, rng, alpha, ae,
                              n_shots, mlae_shots)
         q_total += r.oracle_queries
         rank = min(r.estimate / aF, 1.0)
-        t_s = F0(s)
-        ts.append(t_s); ds.append(rank - t_s)
+        c_lo, c_hi = r.ci[0] / aF_hi, min(r.ci[1] / aF_lo, 1.0)
+        if c_hi < q:
+            br[0] = max(br[0], t)
+        elif c_lo > q:
+            br[1] = min(br[1], t)
+        runs_t.append((t, rank, h, c_lo, c_hi))
         steps.append((s, rank, h, r.oracle_queries))
-        p_t = solve_t()
+        return rank
+
+    def root():
+        tt = np.array([0.0, 1.0] + [v[0] for v in runs_t])
+        rr = np.array([0.0, 1.0] + [v[1] for v in runs_t])
+        ww = np.array([1e12, 1e12] + [1.0 / v[2] ** 2 for v in runs_t])
+        o = np.argsort(tt, kind="stable")
+        tt, fit = tt[o], _isotonic(tt[o], rr[o], ww[o])
+        if fit[0] >= q:
+            t = 0.0
+        else:
+            j = int(np.argmax(fit >= q))          # first fitted point at/above q (fit[-1] = 1)
+            k = len(fit) - 1 - int(np.argmax(fit[::-1] < q))   # last fitted point below q
+            if fit[j] == q:                       # flat at q: middle of the flat run
+                jj = j
+                while jj + 1 < len(fit) and fit[jj + 1] == q:
+                    jj += 1
+                t = 0.5 * (tt[j] + tt[jj])
+            else:
+                t = tt[k] + (q - fit[k]) * (tt[j] - tt[k]) / (fit[j] - fit[k])
+        a_, b_ = br
+        if a_ < b_:
+            t = min(max(t, a_), b_)
+            if t in (a_, b_) and runs_t:        # do not re-measure a bracket end
+                t = 0.5 * (a_ + b_)
+        return float(t)
+
+    def is_conv(v):
+        return v[2] <= eps * (1 + 1e-12) and abs(q - v[1]) <= eps
+
+    t, gap, converged = q, 1.0 / math.sqrt(m0), False
+    for _ in range(max_iter):
+        h = max(eps, shrink * gap)
+        rank = measure(t, h)
         gap = abs(q - rank) + 0.5 * h
-        if h <= eps:
+        if is_conv(runs_t[-1]):
+            converged = True
             break
-    est = QF0(p_t)
+        t = root()
+    n_main = len(steps)
+    n_fb = 0
+    if not converged:
+        cap = max_fallback if max_fallback is not None else 2 * int(math.ceil(math.log2(1.0 / eps))) + 4
+        a_, b_ = br
+        for _ in range(cap):
+            if QF0(b_) - QF0(a_) <= 1e-12 or b_ - a_ <= 1e-12:
+                break
+            tm = 0.5 * (a_ + b_)
+            gap = 0.0
+            rank = measure(tm, eps)
+            n_fb += 1
+            if is_conv(runs_t[-1]):
+                converged = True
+                break
+            if rank < q:
+                a_ = tm
+            else:
+                b_ = tm
+            br[0], br[1] = max(br[0], a_), min(br[1], b_)
+    if converged:
+        t_est = root()
+    else:
+        prec = [v for v in runs_t if v[2] <= eps * (1 + 1e-12)] or runs_t
+        t_est = min(prec, key=lambda v: abs(v[1] - q))[0]
+    est = QF0(t_est)
     ex = inst.quantile(q)
     rk = inst.percentile(est, "strict")
-    return QAEResult(est, (QF0(p_t - eps), QF0(p_t + eps)), q_total,
+    last = runs_t[-1]
+    ci = (QF0(br[0]) if br[0] > 0 else s_min, QF0(br[1]) if br[1] < 1 else s_max)
+    return QAEResult(est, ci, q_total,
                      dict(exact=ex, rank_error=abs(rk - q), rank=rk, a_F_est=aF, steps=steps,
                           method="hybrid", cardinality_only=cardinality_only, classical_queries=N0,
-                          aF_queries=aF_q, m0=int(m0), n_iter=len(steps)))
+                          aF_queries=aF_q, m0=int(m0), n_iter=len(steps), n_main=n_main,
+                          n_fallback=n_fb, converged=bool(converged), last_h=float(last[2]),
+                          last_rank_measured=float(last[1]),
+                          ci_note="CI: bracketing thresholds whose AE rank CI excludes q; >= 1-3 alpha",
+                          rank_band=(QF0(t_est - eps), QF0(t_est + eps))))
 
 
 def classical_quantile(inst: ExactInstance, q: float, N: int, rng: np.random.Generator) -> float:

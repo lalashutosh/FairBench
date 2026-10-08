@@ -11,14 +11,21 @@ the Dicke preparation over the C(n,k) weight-k portfolios and "good" is a Boolea
 
 Cost conventions (all estimators)
 ---------------------------------
-* quantum query      = one application of Q = 1 oracle call (S_chi) + 2 state preps (A, A^dagger).
-* a shot after m iterates costs m queries and 2m+1 state preps (the extra 1 is the initial A).
-* ``AEResult.oracle_queries`` = sum over shots of m  (classical MC: number of samples).
+* oracle query       = one evaluation of the predicate oracle (feasible / feasible & S < s) --
+  the SAME unit as one classical sample (proposal + predicate evaluation).
+* a shot after m Grover iterates Q = A S_0 A^dagger S_chi makes m coherent oracle calls (one
+  S_chi per Q) and ends with ONE classical evaluation of the measured bitstring (the "good"
+  flag of the outcome is read off by evaluating the predicate on it), so it costs m + 1
+  oracle queries and 2m+1 state preps (the extra 1 is the initial A).
+* ``AEResult.oracle_queries`` = sum over shots of (m + 1)  (classical MC: number of samples,
+  i.e. m = 0 sampling costs exactly one query per sample in both models).
+* ``AEResult.extra['grover_calls']`` = sum over shots of m (coherent oracle calls only; the
+  pre-QA-11 ``oracle_queries`` convention, which charged m = 0 shots nothing).
 * ``AEResult.state_preps``    = sum over shots of 2m+1 (classical MC: number of samples).
-* classical query    = one i.i.d. sample from the m=0 distribution (one proposal + one
-  predicate evaluation). ``classical_mc`` is literally m=0 sampling of the same oracle.
-* canonical (QPE) AE: one shot uses M-1 controlled-Q applications (2^j for j < n_eval),
-  i.e. M-1 queries and 2(M-1)+1 state preps; the QFT is not counted.
+* ``classical_mc`` is literally m=0 sampling of the same oracle.
+* canonical (QPE) AE: one shot uses M-1 controlled-Q applications (2^j for j < n_eval)
+  plus the final evaluation, i.e. M queries (M-1 Grover calls) and 2(M-1)+1 state preps;
+  the QFT is not counted.
 
 Nothing here builds circuits: oracles return Binomial hit counts from the exact outcome
 probabilities (``IdealOracle``: closed form; ``SubspaceOracle``: exact state-vector Grover
@@ -59,7 +66,7 @@ _PEPS = 1e-12
 class AEResult:
     estimate: float                      # estimate of the amplitude a = sin^2(theta)
     ci: tuple                            # (lo, hi) confidence interval on a
-    oracle_queries: int                  # sum over shots of m (classical: #samples)
+    oracle_queries: int                  # sum over shots of m+1 (classical: #samples)
     state_preps: int                     # sum over shots of 2m+1 (classical: #samples)
     shots: int                           # total number of shots / samples
     method: str
@@ -68,10 +75,15 @@ class AEResult:
 
 
 def _cost(schedule):
-    q = sum(int(m) * int(n) for m, n, _ in schedule)
+    """(oracle_queries = sum n (m+1), state_preps = sum n (2m+1), shots = sum n)."""
+    q = sum((int(m) + 1) * int(n) for m, n, _ in schedule)
     p = sum((2 * int(m) + 1) * int(n) for m, n, _ in schedule)
     s = sum(int(n) for _, n, _ in schedule)
     return q, p, s
+
+
+def _grover_calls(schedule) -> int:
+    return sum(int(m) * int(n) for m, n, _ in schedule)
 
 
 def _z(conf: float) -> float:
@@ -184,7 +196,7 @@ def classical_mc(oracle, n_queries: int, rng: np.random.Generator, conf: float =
     sched = [(0, n, h)]
     # classical query = one sample (proposal + predicate evaluation)
     return AEResult(p, _binom_ci(h, n, conf, ci_method), n, n, n, "classical_mc", sched,
-                    dict(std=math.sqrt(max(p * (1 - p), 1.0 / n) / n), conf=conf))
+                    dict(std=math.sqrt(max(p * (1 - p), 1.0 / n) / n), conf=conf, grover_calls=0))
 
 
 # ============================================================================ canonical AE
@@ -228,7 +240,8 @@ def canonical_ae(oracle, n_eval_qubits: int, shots: int, rng: np.random.Generato
     sched = [(m, int(shots), int(np.sum(a_y == est)))]
     q, sp, s = _cost(sched)
     return AEResult(est, (max(0.0, est - half), min(1.0, est + half)), q, sp, s,
-                    "canonical_ae", sched, dict(M=M, y=ys, std=half / 2))
+                    "canonical_ae", sched, dict(M=M, y=ys, std=half / 2,
+                                                grover_calls=_grover_calls(sched)))
 
 
 # ============================================================================ IQAE
@@ -336,7 +349,8 @@ def iqae(oracle, eps: float, alpha: float, rng: np.random.Generator, n_shots: in
     q, sp, s = _cost(sched)
     return AEResult(est, (a_l, a_u), q, sp, s, f"iqae_{ci_method}", sched,
                     dict(std=(a_u - a_l) / (2 * _z(1 - alpha)), rounds=len(sched), T=T, restarts=n_restarts,
-                         theta=math.pi * (th_l + th_u), conf=1 - alpha))
+                         theta=math.pi * (th_l + th_u), conf=1 - alpha,
+                         grover_calls=_grover_calls(sched)))
 
 
 def iqae_amplitude_tol(oracle, eps_a: float, alpha: float, rng: np.random.Generator,
@@ -355,11 +369,12 @@ def iqae_amplitude_tol(oracle, eps_a: float, alpha: float, rng: np.random.Genera
     ``pilot=False``: a_g = 1/2 (worst case, eps_theta = eps_a/1), nothing charged, full alpha."""
     if eps_a <= 0:
         raise ValueError("eps_a must be > 0")
-    pq = ps = psh = 0
+    pq = ps = psh = pg = 0
     a_hat = None
     if pilot:
         pr = iqae(oracle, pilot_eps, alpha / 2, rng, n_shots=pilot_shots, **kw)
         pq, ps, psh = pr.oracle_queries, pr.state_preps, pr.shots
+        pg = pr.extra["grover_calls"]
         a_hat = pr.estimate
         lo, hi = pr.ci
         a_g = 0.5 if lo <= 0.5 <= hi else (lo if lo > 0.5 else hi)
@@ -373,7 +388,8 @@ def iqae_amplitude_tol(oracle, eps_a: float, alpha: float, rng: np.random.Genera
     r.oracle_queries += pq
     r.state_preps += ps
     r.shots += psh
-    r.extra.update(pilot_queries=pq, pilot_state_preps=ps, pilot_shots=psh,
+    r.extra["grover_calls"] += pg
+    r.extra.update(pilot_queries=pq, pilot_grover_calls=pg, pilot_state_preps=ps, pilot_shots=psh,
                    pilot_a_hat=a_hat, eps_theta=eps_th, eps_a=eps_a, conf=1 - alpha)
     r.method = r.method + "_atol"
     return r
@@ -496,7 +512,7 @@ def mlae(oracle, schedule: Sequence[int], shots, rng: np.random.Generator,
     std = (a_hi - a_lo) / (2 * z) if ci == "lr" else abs(math.sin(2 * th)) * sd_th
     return AEResult(est, (a_lo, a_hi), q, sp, s, name, sched,
                     dict(theta=th, theta_std=sd_th, fisher=I, ci_method=ci,
-                         std=std, loglik=ll_hat, conf=conf,
+                         std=std, loglik=ll_hat, conf=conf, grover_calls=_grover_calls(sched),
                          gamma=gamma, p_mixed=p_mixed if gamma else None))
 
 
@@ -532,4 +548,6 @@ def ratio_estimate(res_num: AEResult, res_den: AEResult, conf: float = 0.95,
                     res_num.shots + res_den.shots,
                     f"ratio[{res_num.method}/{res_den.method}]",
                     list(res_num.schedule) + list(res_den.schedule),
-                    dict(std=s, num=res_num, den=res_den, raw_ratio=r))
+                    dict(std=s, num=res_num, den=res_den, raw_ratio=r,
+                         grover_calls=res_num.extra.get("grover_calls", 0)
+                         + res_den.extra.get("grover_calls", 0)))
