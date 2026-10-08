@@ -14,6 +14,8 @@ _Last updated 2026-10-08 (after the quantum amplitude estimation wave, QA). Repo
 - **Reviews:** three independent read-only reviews. All findings fixed, including fair classical baselines (swap-MCMC, shared samples, enumeration), charging every quantum shot, and no use of true amplitudes to set parameters.
 - **Headline (finding #8 below):** quadratically fewer queries in noiseless simulation, robust where tight mandates fragment the feasible set. No advantage on today's hardware, and no wall-clock advantage even fault-tolerant.
 
+**Real US fund data (started 2026-10-08 evening).** Plan and research: [`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md`](FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md) (SEC sources, eight candidate funds with SEC identifiers, data gaps, schema, constraint DSL, three reference distributions, staged build plan). Market and standards context: [`FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md`](FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md) (written in a Codex session; it existed only in Codex checkpoint refs until it was restored into the repo on 2026-10-08).
+
 **Do next, in this order.**
 1. **Run the AI layer against the real API.** It has never made a live call. Set `ANTHROPIC_API_KEY` in the shell (the user does this; never commit a key), then `.venv/bin/python scripts/demo_mandate.py --live`. It prints whether Claude's spec matches the hand-written reference and saves `results/mandate_rules_live.json`. Fix the prompt in `fairbench/mandate.py` if they differ.
 2. **Try it on a real fund's policy text** (a prospectus or SFDR pre-contractual disclosure). Expect new rule types: add them to `RULE_FIELDS` and `compile_spec` in `fairbench/rules.py`, and to the kinds list in `SYSTEM_PROMPT`.
