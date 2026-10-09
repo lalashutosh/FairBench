@@ -1,0 +1,53 @@
+{
+ "synthetic": true,
+ "fund": "Synthetic Example ESG Equity Fund (not a real fund)",
+ "universe_proxy": "Synthetic Broad Market Index Fund (not a real fund)",
+ "first_start": "2024-03-31",
+ "last_end": "2025-06-30",
+ "n_excluded_keys": 6,
+ "return_kind": "price",
+ "by_reference": [
+  {
+   "reference": "any k names",
+   "weights": "equal",
+   "n_periods": 5,
+   "mean_percentile_1q": 62.19199999999999,
+   "mean_percentile_to_end": 39.972,
+   "share_of_quarters_above_median": 0.8,
+   "se_if_random_1q": 12.911056502083786,
+   "z_1q": 0.9443069200442473
+  },
+  {
+   "reference": "any k names",
+   "weights": "benchmark_capped",
+   "n_periods": 5,
+   "mean_percentile_1q": 62.668000000000006,
+   "mean_percentile_to_end": 46.436,
+   "share_of_quarters_above_median": 0.8,
+   "se_if_random_1q": 12.911056502083786,
+   "z_1q": 0.9811745458596242
+  },
+  {
+   "reference": "k names obeying the exclusions",
+   "weights": "equal",
+   "n_periods": 5,
+   "mean_percentile_1q": 69.764,
+   "mean_percentile_to_end": 57.69199999999999,
+   "share_of_quarters_above_median": 0.8,
+   "se_if_random_1q": 12.911056502083786,
+   "z_1q": 1.5307810012922005
+  },
+  {
+   "reference": "k names obeying the exclusions",
+   "weights": "benchmark_capped",
+   "n_periods": 5,
+   "mean_percentile_1q": 68.38,
+   "mean_percentile_to_end": 62.984,
+   "share_of_quarters_above_median": 0.8,
+   "se_if_random_1q": 12.911056502083786,
+   "z_1q": 1.423586055644133
+  }
+ ],
+ "mean_rule_conditioned_shift_1q": -0.004878000597752008,
+ "reading": "50 = the typical portfolio allowed by the same rules. One-quarter percentiles do not overlap; if the picks were no better than random, their average would be 50 give or take se_if_random_1q. Hold-to-end windows overlap, so their average has no such yardstick. Not evidence of skill."
+}

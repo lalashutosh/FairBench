@@ -25,6 +25,7 @@ from __future__ import annotations
 import gzip
 import os
 import random
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -99,10 +100,26 @@ def _decode(headers: Mapping[str, str], body: bytes) -> bytes:
     return body
 
 
+_SYSTEM_CA_BUNDLES = ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt")
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """A verifying TLS context. Some Python builds ship without a certificate store, and
+    every HTTPS request then fails as a network error; in that case the operating system's
+    own bundle is loaded. Certificate verification is never switched off."""
+    ctx = ssl.create_default_context()
+    if not ctx.cert_store_stats().get("x509_ca"):
+        for bundle in _SYSTEM_CA_BUNDLES:
+            if os.path.exists(bundle):
+                ctx.load_verify_locations(cafile=bundle)
+                break
+    return ctx
+
+
 def urllib_transport(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
     """The real transport. Never raises for HTTP or network failures: they come back as a
     status (the HTTP code, or 599 for a network error / timeout / undecodable body)."""
-    opener = urllib.request.build_opener(_AllowedRedirects)
+    opener = urllib.request.build_opener(_AllowedRedirects, urllib.request.HTTPSHandler(context=_ssl_context()))
     request = urllib.request.Request(url, headers=headers)
     try:
         try:

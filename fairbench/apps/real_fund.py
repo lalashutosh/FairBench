@@ -38,7 +38,7 @@ import pandas as pd
 from ..constraints import (Cardinality, ConstraintSet, Exclusion, WeightRuleSet, active_risk)
 from ..data import Universe
 from ..ingest.identifiers import add_security_keys
-from ..ingest.prices import NportImpliedReturns, ReturnSource, nav_period_return, net_flow_ratio
+from ..ingest.prices import ChainedReturns, NportImpliedReturns, ReturnSource, nav_period_return, net_flow_ratio
 from ..portfolio.reference import (ReferenceSample, benchmark_aware, reference_statistics, uniform_subsets,
                                    uniform_weights)
 from ..portfolio.weights import WeightGrid
@@ -93,7 +93,27 @@ class PeriodCase:
     return_source: str
 
 
+def default_source(parent_start, parent_end, fund_start, fund_end=None, extra: Sequence[tuple] = (),
+                   share_change: str = "plain") -> ChainedReturns:
+    """Price returns from filings, in order of preference: the parent index fund, then any
+    ``extra`` index funds given as (report at start, report at end) pairs (a broader index
+    fund prices names that left the parent), then the fund's own filings for names nobody
+    else holds (only while its share count is unchanged)."""
+    start, end = parent_start.report_date, parent_end.report_date
+    srcs = [NportImpliedReturns({start: keyed_sleeve(parent_start), end: keyed_sleeve(parent_end)},
+                                name="parent index fund", share_change=share_change)]
+    for i, (a, b) in enumerate(extra):
+        if a is not None and b is not None and a.report_date == start and b.report_date == end:
+            srcs.append(NportImpliedReturns({start: keyed_sleeve(a), end: keyed_sleeve(b)},
+                                            name=f"extra index fund {i + 1}", share_change=share_change))
+    if fund_end is not None and fund_end.report_date == end:
+        srcs.append(NportImpliedReturns({start: keyed_sleeve(fund_start), end: keyed_sleeve(fund_end)},
+                                        name="the fund's own filings", passive=False))
+    return ChainedReturns(srcs, name="nport_implied")
+
+
 def build_period_case(parent_start, parent_end, fund_start, fund_end=None, *, source: ReturnSource | None = None,
+                      extra_price_reports: Sequence[tuple] = (), share_change: str = "plain",
                       unknown_returns: str = "drop", sectors: Mapping[str, str] | None = None,
                       class_id: str | None = None) -> PeriodCase:
     """Assemble one period from N-PORT reports (``ingest.nport.NportReport``).
@@ -113,11 +133,9 @@ def build_period_case(parent_start, parent_end, fund_start, fund_end=None, *, so
     start, end = parent_start.report_date, parent_end.report_date
     if not (fund_start.report_date == start and start < end):
         raise ValueError(f"report dates do not line up: parent {start} -> {end}, fund {fund_start.report_date}")
-    ps, pe, fs = keyed_sleeve(parent_start), keyed_sleeve(parent_end), keyed_sleeve(fund_start)
+    ps, fs = keyed_sleeve(parent_start), keyed_sleeve(fund_start)
     if source is None:
-        source = NportImpliedReturns({start: ps.copy(), end: pe.copy()})
-        if fund_end is not None and fund_end.report_date == end:  # prices for names only the fund holds
-            source.add({start: fs.copy(), end: keyed_sleeve(fund_end)})
+        source = default_source(parent_start, parent_end, fund_start, fund_end, extra_price_reports, share_change)
     all_keys = list(dict.fromkeys(ps["security_key"].tolist() + fs["security_key"].tolist()))
     rets = source.period_returns(all_keys, start, end)
 
@@ -127,7 +145,12 @@ def build_period_case(parent_start, parent_end, fund_start, fund_end=None, *, so
     cov_note = {"n_universe_before": int(len(uni)), "n_unknown_return": int(unknown.sum()),
                 "benchmark_weight_unknown_return": float(uni["weight"].to_numpy()[unknown].sum()),
                 "unknown_returns_policy": unknown_returns,
-                "n_split_adjusted": int(rets.loc[uni.index, "split_adjusted"].sum())}
+                "n_split_adjusted": int(rets.loc[uni.index, "split_adjusted"].sum()),
+                "n_share_count_changed": int(rets.loc[uni.index, "share_count_changed"].sum()),
+                "benchmark_weight_share_count_changed": float(
+                    uni["weight"].to_numpy()[rets.loc[uni.index, "share_count_changed"].to_numpy(dtype=bool)].sum()),
+                "n_priced_outside_parent": int((rets.loc[uni.index, "ret"].notna()
+                                                & ~rets.loc[uni.index, "note"].astype(str).str.startswith("parent")).sum())}
     if unknown_returns == "drop":
         uni, r_uni = uni[~unknown], r_uni[~unknown]
     elif unknown.any():
@@ -166,10 +189,10 @@ def build_period_case(parent_start, parent_end, fund_start, fund_end=None, *, so
         "fund_equity_share_of_net_assets": fs.attrs["equity_share_of_net_assets"],
         "parent_equity_share_of_net_assets": ps.attrs["equity_share_of_net_assets"],
         "sectors_known": sectors is not None,
-        "max_price_disagreement": float(getattr(source, "max_price_disagreement", float("nan"))),
+        "max_return_disagreement_between_sources": float(getattr(source, "max_disagreement", float("nan"))),
     }
-    nav = nav_period_return(fund_end, class_id) if fund_end is not None and fund_end.report_date == end else \
-        dict(class_id=class_id, nav_return=float("nan"), status="unknown", note="no fund report at the end date")
+    nav = nav_period_return(fund_end, class_id, reference=frozen) if fund_end is not None and fund_end.report_date == end \
+        else dict(class_id=class_id, nav_return=float("nan"), status="unknown", note="no fund report at the end date")
     if fund_end is not None:
         nav["net_flow_ratio"] = net_flow_ratio(fund_end)
     return PeriodCase(
@@ -203,7 +226,9 @@ class PeriodResult:
         lines = [
             f"{c.fund_name} ({c.fund_id})  {c.start} -> {c.end}   [{c.return_kind} returns from {c.return_source}]",
             f"  universe: {c.coverage['n_universe']} securities from {c.parent_name} (benchmark proxy), "
-            f"{c.coverage['n_unknown_return']} with unknown return ({c.coverage['unknown_returns_policy']})",
+            f"{c.coverage['n_unknown_return']} with unknown return ({c.coverage['unknown_returns_policy']}), "
+            f"{c.coverage['n_split_adjusted']} split-adjusted, {c.coverage['n_share_count_changed']} with a changed "
+            f"share count (plain return assumed)",
             f"  fund: {c.coverage['n_fund_holdings']} holdings, {c.coverage['n_fund_in_universe']} in the universe "
             f"({100 * c.coverage['fund_weight_in_universe']:.1f}% of its equity weight)",
             f"  realised frozen-holdings return {pct(r['frozen_return'])}   benchmark proxy {pct(r['benchmark_proxy_return'])}"
@@ -284,6 +309,7 @@ def run_period(case: PeriodCase, *, excluded_keys: Sequence[str] = (), selection
     realised = dict(frozen_return=case.fund_frozen_return, in_universe_return=case.fund_in_universe_return,
                     benchmark_proxy_return=case.benchmark_proxy_return, nav_return=case.fund_nav["nav_return"],
                     nav_class_id=case.fund_nav.get("class_id"), nav_status=case.fund_nav["status"],
+                    nav_units=case.fund_nav.get("units"),
                     nav_minus_frozen=case.fund_nav["nav_return"] - case.fund_frozen_return,
                     net_flow_ratio=case.fund_nav.get("net_flow_ratio"))
     if cov is None:
@@ -347,11 +373,14 @@ def run_history(parent_reports: Mapping[date, object], fund_reports: Mapping[dat
     start date, so nothing from the future enters. Until ``min_cov_periods`` periods have
     accumulated, the benchmark-aware reference is skipped."""
     dates = sorted(set(parent_reports) & set(fund_reports))
-    build_kw = {k: run_kwargs.pop(k) for k in ("source", "unknown_returns", "sectors", "class_id") if k in run_kwargs}
+    build_kw = {k: run_kwargs.pop(k) for k in ("source", "unknown_returns", "sectors", "class_id", "share_change")
+                if k in run_kwargs}
+    extra = run_kwargs.pop("price_reports", ())   # extra index funds: sequence of {date: report}
     out: list[PeriodResult] = []
     past: list[pd.Series] = []
     for t, t1 in zip(dates[:-1], dates[1:]):
-        case = build_period_case(parent_reports[t], parent_reports[t1], fund_reports[t], fund_reports[t1], **build_kw)
+        case = build_period_case(parent_reports[t], parent_reports[t1], fund_reports[t], fund_reports[t1],
+                                 extra_price_reports=[(e.get(t), e.get(t1)) for e in extra], **build_kw)
         est = single_index_cov(pd.DataFrame(past), case.keys, case.benchmark, min_cov_periods) if past else None
         res = run_period(case, cov=None if est is None else est[0], **run_kwargs)
         if est is not None:
@@ -379,3 +408,126 @@ def history_table(results: Sequence[PeriodResult], label_contains: str = "capped
                          realised_portfolio_percentile=row["percentile"], percentile_se=row["percentile_se"],
                          fund_weight_in_universe=res.case.coverage["fund_weight_in_universe"]))
     return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------- hold to the end date
+def _path_values(W0: np.ndarray, R: np.ndarray) -> np.ndarray:
+    """(m,) value of 1 invested in each row of weights and held, untraded, through the
+    periods in R (T, n; NaN = unknown return). A holding whose return is unknown in a
+    period is left out of that period (the rest of the portfolio's return applies to it)
+    and is gone afterwards, its value spread over the remaining holdings pro rata. The same
+    rule is applied to the fund and to every simulated portfolio."""
+    w = np.array(W0, dtype=float)
+    value = np.ones(w.shape[0])
+    for r in R:
+        known = ~np.isnan(r)
+        wk = w * known[None, :]
+        tot = wk.sum(axis=1)
+        growth = wk @ np.where(known, 1.0 + r, 0.0)
+        ok = tot > 0
+        value *= np.where(ok, growth / np.where(ok, tot, 1.0), 1.0)
+        w = wk * np.where(known, 1.0 + r, 0.0)[None, :]
+        s = w.sum(axis=1, keepdims=True)
+        w = np.divide(w, s, out=np.zeros_like(w), where=s > 0)
+    return value
+
+
+def run_hold_to_end(parent_reports: Mapping[date, object], fund_reports: Mapping[date, object], *,
+                    price_reports: Sequence[Mapping[date, object]] = (), excluded_keys: Sequence[str] = (),
+                    n_samples: int = 5000, seed: int | None = 0, share_change: str = "plain") -> pd.DataFrame:
+    """For every report date t: the fund's portfolio at t and random portfolios drawn from
+    the universe at t, all held WITHOUT TRADING from t (a) for one quarter and (b) until the
+    last report date; and the fund's percentile among them at both horizons.
+
+    One row per start date and reference set. Reference sets: "any k names" (holdings count
+    only) and, if ``excluded_keys`` is given, "k names obeying the exclusions"; each with
+    equal weights and with benchmark-proportional weights capped at the fund's largest
+    position. The difference between the two sets' medians is the rule-conditioned shift:
+    what the exclusions did to a typical portfolio.
+
+    Read with care. No fund holds a portfolio unchanged for years, so the long horizon
+    describes the portfolio it had on that date, not the manager's later actions. The
+    long-horizon windows overlap almost entirely (the 2020 and 2021 start dates share
+    every later quarter), so their percentiles are not independent observations and their
+    average has no simple error bar; the one-quarter percentiles do not overlap.
+    """
+    dates = sorted(set(parent_reports) & set(fund_reports))
+    if len(dates) < 2:
+        raise ValueError("need at least two common report dates")
+    psl = {d: keyed_sleeve(parent_reports[d]) for d in dates}
+    fsl = {d: keyed_sleeve(fund_reports[d]) for d in dates}
+    seen: list[str] = []
+    period_returns: list[pd.Series] = []
+    for t, t1 in zip(dates[:-1], dates[1:]):  # returns of everything any earlier portfolio could hold
+        seen = list(dict.fromkeys(seen + psl[t]["security_key"].tolist() + fsl[t]["security_key"].tolist()))
+        src = default_source(parent_reports[t], parent_reports[t1], fund_reports[t], fund_reports[t1],
+                             [(e.get(t), e.get(t1)) for e in price_reports], share_change)
+        period_returns.append(src.period_returns(seen, t, t1)["ret"])
+    excl = set(excluded_keys)
+    seeds = np.random.SeedSequence(seed).generate_state(len(dates))
+    rows = []
+    for i, t in enumerate(dates[:-1]):
+        uni, f = psl[t].set_index("security_key"), fsl[t].set_index("security_key")
+        keys = list(dict.fromkeys(uni.index.tolist() + f.index.tolist()))     # universe first, then fund-only names
+        n_u, n = len(uni), len(keys)
+        R = np.vstack([pr.reindex(keys).to_numpy(dtype=float) for pr in period_returns[i:]])
+        b = np.zeros(n)
+        b[:n_u] = uni["weight"].to_numpy(dtype=float)
+        wf = np.zeros(n)
+        pos = {k: j for j, k in enumerate(keys)}
+        wf[[pos[k] for k in f.index]] = f["weight"].to_numpy(dtype=float)
+        in_uni = wf[:n_u] > 0
+        k = int(in_uni.sum())
+        cap = float(max(wf[:n_u].max() / wf[:n_u].sum(), 1.0 / k))
+        fund_1q, fund_end = float(_path_values(wf[None, :], R[:1])[0] - 1), float(_path_values(wf[None, :], R)[0] - 1)
+        u = Universe(tickers=keys, mu=np.full(n, np.nan), cov=np.full((n, n), np.nan), sector=["unknown"] * n,
+                     esg_score=np.full(n, np.nan), carbon=np.full(n, np.nan))
+        off = list(range(n_u, n))                                             # fund-only names are never drawn
+        sets = [("any k names", off)]
+        if excl:
+            sets.append(("k names obeying the exclusions", off + [pos[x] for x in excl if x in pos and pos[x] < n_u]))
+        medians = {}
+        for label, banned in sets:
+            cs = ConstraintSet([Cardinality(k)] + ([Exclusion(sorted(set(banned)))] if banned else []))
+            for policy in ("equal", "benchmark_capped"):
+                ref = uniform_subsets(u, cs, n_samples, policy=policy, benchmark=b, cap=cap, seed=int(seeds[i]),
+                                      batch=int(min(20_000, max(2 * n_samples, 2_000))))
+                v1, vT = _path_values(ref.weights, R[:1]) - 1, _path_values(ref.weights, R) - 1
+                medians[(label, policy)] = (float(np.median(v1)), float(np.median(vT)))
+                rows.append(dict(
+                    start=str(t), end=str(dates[-1]), quarters_to_end=len(dates) - 1 - i, k=k, n_universe=n_u,
+                    n_eligible=ref.info["n_eligible"], reference=label, weights=policy, position_cap=cap,
+                    fund_return_1q=fund_1q, median_1q=float(np.median(v1)), percentile_1q=weighted_percentile(v1, fund_1q),
+                    fund_return_to_end=fund_end, median_to_end=float(np.median(vT)),
+                    p05_to_end=float(np.quantile(vT, 0.05)), p95_to_end=float(np.quantile(vT, 0.95)),
+                    percentile_to_end=weighted_percentile(vT, fund_end),
+                    fund_weight_in_universe=float(wf[:n_u].sum()), n_samples=ref.n, seed=int(seeds[i]),
+                    n_violations=ref.n_violations,
+                    fund_holds_excluded=int(sum(wf[pos[x]] > 0 for x in excl if x in pos))))
+        if excl:
+            for r_ in rows[-4:]:
+                free = medians[("any k names", r_["weights"])]
+                ruled = medians[("k names obeying the exclusions", r_["weights"])]
+                r_["rule_conditioned_shift_1q"], r_["rule_conditioned_shift_to_end"] = ruled[0] - free[0], ruled[1] - free[1]
+    return pd.DataFrame(rows)
+
+
+def weighted_percentile(values: np.ndarray, x: float) -> float:
+    """Mid-rank of x among values, 0..100."""
+    v = np.asarray(values, dtype=float)
+    return float(100.0 * ((v < x).sum() + 0.5 * (v == x).sum()) / v.size)
+
+
+def summarise_percentiles(table: pd.DataFrame) -> pd.DataFrame:
+    """Average percentile per reference set and weighting, at both horizons. For the
+    one-quarter horizon the periods do not overlap, so under "the fund's picks are no
+    different from random rule-abiding picks" each percentile is uniform on 0..100 and the
+    average of n of them has standard error 28.9 / sqrt(n); that yardstick is given. The
+    long-horizon average has no such yardstick (overlapping windows) and gets none."""
+    g = table.groupby(["reference", "weights"], sort=False)
+    out = g.agg(n_periods=("percentile_1q", "size"), mean_percentile_1q=("percentile_1q", "mean"),
+                mean_percentile_to_end=("percentile_to_end", "mean"),
+                share_of_quarters_above_median=("percentile_1q", lambda s: float((s > 50).mean()))).reset_index()
+    out["se_if_random_1q"] = 28.87 / np.sqrt(out["n_periods"])
+    out["z_1q"] = (out["mean_percentile_1q"] - 50.0) / out["se_if_random_1q"]
+    return out

@@ -1,0 +1,53 @@
+{
+ "synthetic": false,
+ "fund": "Parnassus Core Equity Fund",
+ "universe_proxy": "iShares Core S&P 500 ETF",
+ "first_start": "2019-09-30",
+ "last_end": "2026-06-30",
+ "n_excluded_keys": 27,
+ "return_kind": "price",
+ "by_reference": [
+  {
+   "reference": "any k names",
+   "weights": "equal",
+   "n_periods": 27,
+   "mean_percentile_1q": 54.45703703703703,
+   "mean_percentile_to_end": 67.4837037037037,
+   "share_of_quarters_above_median": 0.5185185185185185,
+   "se_if_random_1q": 5.556034090501498,
+   "z_1q": 0.8021975683440654
+  },
+  {
+   "reference": "any k names",
+   "weights": "benchmark_capped",
+   "n_periods": 27,
+   "mean_percentile_1q": 53.12148148148148,
+   "mean_percentile_to_end": 62.00888888888889,
+   "share_of_quarters_above_median": 0.5925925925925926,
+   "se_if_random_1q": 5.556034090501498,
+   "z_1q": 0.5618182737247623
+  },
+  {
+   "reference": "k names obeying the exclusions",
+   "weights": "equal",
+   "n_periods": 27,
+   "mean_percentile_1q": 56.189629629629636,
+   "mean_percentile_to_end": 67.21481481481482,
+   "share_of_quarters_above_median": 0.5185185185185185,
+   "se_if_random_1q": 5.556034090501498,
+   "z_1q": 1.1140373742866916
+  },
+  {
+   "reference": "k names obeying the exclusions",
+   "weights": "benchmark_capped",
+   "n_periods": 27,
+   "mean_percentile_1q": 54.27111111111111,
+   "mean_percentile_to_end": 61.23777777777778,
+   "share_of_quarters_above_median": 0.5925925925925926,
+   "se_if_random_1q": 5.556034090501498,
+   "z_1q": 0.7687337841236306
+  }
+ ],
+ "mean_rule_conditioned_shift_1q": -0.0006658674536531068,
+ "reading": "50 = the typical portfolio allowed by the same rules. One-quarter percentiles do not overlap; if the picks were no better than random, their average would be 50 give or take se_if_random_1q. Hold-to-end windows overlap, so their average has no such yardstick. Not evidence of skill."
+}

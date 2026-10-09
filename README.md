@@ -30,8 +30,8 @@ fund - benchmark = (same-rules median - benchmark)   constraint effect: what the
 ## Status, stated plainly
 
 - **All attribution results so far use synthetic data** with a planted ground truth. No real fund has been analysed.
-  The pipeline for real US funds (SEC filings to reference distributions) is built and tested offline, but it has
-  never downloaded a real filing: that needs a contact string only the team can supply.
+  One real fund has been run through the pipeline for real US funds (Parnassus Core Equity, see below), under a
+  proxy mandate: holdings count and an exclusion list from SEC industry codes, price returns without dividends.
 - **No quantum speedup was found.** Three routes were benchmarked against strong classical baselines:
 
 | Route | Result |
@@ -160,7 +160,20 @@ involvement), `attr_<name>` columns (numbers such as market cap) and `cat_<name>
 
 ## Real funds from public filings
 
-Built and tested offline; **not yet run on a real fund** (see the status line below).
+First real run, 2026-10-09: **Parnassus Core Equity against 27 quarters of S&P 500 portfolios**
+(2019-09-30 to 2026-06-30), entirely from SEC filings.
+
+![Parnassus Core Equity against the index and the typical rule-abiding portfolio](results/real_fund_parnassus_core_equity.png)
+
+- Its disclosed portfolios, held one quarter at a time, grew +135% in price terms; the S&P 500 index
+  fund +149%; the typical 36-stock portfolio allowed by the same rules +105%.
+- Quarter by quarter the fund's portfolio ranked at percentile 54 on average among those portfolios
+  (50 is typical; random picks would average 50 give or take 6). That is not distinguishable from 50.
+- Excluding 27 fossil-fuel, tobacco, alcohol and weapons companies moved the typical portfolio's result
+  by -2 points over the whole period.
+- **This is a proxy mandate.** The rules applied are the number of holdings and an exclusion list built from SEC
+  industry codes. The fund's own ESG research cannot be reproduced from public data. Returns are price returns
+  derived from the filings, without dividends. A percentile is not evidence of skill.
 
 ```
 SEC EDGAR --polite client, raw archive--> N-PORT holdings --> database (every row cites its filing)
@@ -191,11 +204,25 @@ export FAIRBENCH_SEC_USER_AGENT="Your Project Name contact@your-domain.org"
 ```
 
 ```bash
-.venv/bin/python scripts/real_fund_attribution.py --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --name parnassus_core_equity
+.venv/bin/python scripts/real_fund_ingest.py --series S000004347
+```
+
+```bash
+.venv/bin/python scripts/build_sic_exclusions.py --parent-dir data/nport/S000004310
+```
+
+```bash
+.venv/bin/python scripts/real_fund_attribution.py --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --price-dir data/nport/S000004347 --exclude-file data/exclusions_sic.csv --name parnassus_core_equity
+```
+
+```bash
+.venv/bin/python scripts/real_fund_figure.py --name parnassus_core_equity --short-name "Parnassus Core Equity"
 ```
 
 `S000000856` is Parnassus Core Equity and `S000004310` is iShares Core S&P 500, used as the
-stand-in for its universe and benchmark weights. Other candidates and their identifiers are in
+stand-in for its universe and benchmark weights. `S000004347` is iShares Russell 1000, used only to
+price companies after they leave the S&P 500. The exclusion list is a stand-in built from the SEC's
+industry codes. Other candidates and their identifiers are in
 [`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md`](FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md).
 
 What the output means:

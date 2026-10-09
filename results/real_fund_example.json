@@ -27,6 +27,9 @@
     "benchmark_weight_unknown_return": 0.0,
     "unknown_returns_policy": "drop",
     "n_split_adjusted": 0,
+    "n_share_count_changed": 0,
+    "benchmark_weight_share_count_changed": 0.0,
+    "n_priced_outside_parent": 0,
     "n_universe": 60,
     "n_fund_holdings": 15,
     "n_fund_in_universe": 15,
@@ -38,7 +41,7 @@
     "fund_equity_share_of_net_assets": 0.9900000027346129,
     "parent_equity_share_of_net_assets": 0.9998084826754162,
     "sectors_known": false,
-    "max_price_disagreement": 2.220446049250313e-16
+    "max_return_disagreement_between_sources": 1.1102230246251565e-16
    },
    "realised": {
     "frozen_return": -0.034264104805651396,
@@ -47,6 +50,7 @@
     "nav_return": -0.03572890077939983,
     "nav_class_id": "C000000091",
     "nav_status": "disclosed",
+    "nav_units": "percent",
     "nav_minus_frozen": -0.001464795973748434,
     "net_flow_ratio": -0.006144737275603911
    },
@@ -176,6 +180,9 @@
     "benchmark_weight_unknown_return": 0.0,
     "unknown_returns_policy": "drop",
     "n_split_adjusted": 0,
+    "n_share_count_changed": 0,
+    "benchmark_weight_share_count_changed": 0.0,
+    "n_priced_outside_parent": 0,
     "n_universe": 60,
     "n_fund_holdings": 15,
     "n_fund_in_universe": 15,
@@ -187,7 +194,7 @@
     "fund_equity_share_of_net_assets": 0.989999997206801,
     "parent_equity_share_of_net_assets": 0.9997931778642517,
     "sectors_known": false,
-    "max_price_disagreement": 1.1102230246251565e-16
+    "max_return_disagreement_between_sources": 2.220446049250313e-16
    },
    "realised": {
     "frozen_return": 0.020831613568369954,
@@ -196,6 +203,7 @@
     "nav_return": 0.01931160866637094,
     "nav_class_id": "C000000091",
     "nav_status": "disclosed",
+    "nav_units": "percent",
     "nav_minus_frozen": -0.0015200049019990156,
     "net_flow_ratio": -0.006118114533251047
    },
@@ -325,6 +333,9 @@
     "benchmark_weight_unknown_return": 0.0,
     "unknown_returns_policy": "drop",
     "n_split_adjusted": 1,
+    "n_share_count_changed": 0,
+    "benchmark_weight_share_count_changed": 0.0,
+    "n_priced_outside_parent": 0,
     "n_universe": 60,
     "n_fund_holdings": 15,
     "n_fund_in_universe": 15,
@@ -336,7 +347,7 @@
     "fund_equity_share_of_net_assets": 0.9899999988978033,
     "parent_equity_share_of_net_assets": 0.9997957354444591,
     "sectors_known": false,
-    "max_price_disagreement": 2.220446049250313e-16
+    "max_return_disagreement_between_sources": 2.220446049250313e-16
    },
    "realised": {
     "frozen_return": 0.013980026678070407,
@@ -345,6 +356,7 @@
     "nav_return": 0.012466832378007053,
     "nav_class_id": "C000000091",
     "nav_status": "disclosed",
+    "nav_units": "percent",
     "nav_minus_frozen": -0.0015131943000633533,
     "net_flow_ratio": -0.006010735798262872
    },
@@ -474,6 +486,9 @@
     "benchmark_weight_unknown_return": 0.01115949442159433,
     "unknown_returns_policy": "drop",
     "n_split_adjusted": 0,
+    "n_share_count_changed": 0,
+    "benchmark_weight_share_count_changed": 0.0,
+    "n_priced_outside_parent": 0,
     "n_universe": 59,
     "n_fund_holdings": 15,
     "n_fund_in_universe": 15,
@@ -485,7 +500,7 @@
     "fund_equity_share_of_net_assets": 0.9900000049705239,
     "parent_equity_share_of_net_assets": 0.9997997081325679,
     "sectors_known": false,
-    "max_price_disagreement": 2.220446049250313e-16
+    "max_return_disagreement_between_sources": 2.220446049250313e-16
    },
    "realised": {
     "frozen_return": -0.023412714674634596,
@@ -494,6 +509,7 @@
     "nav_return": -0.02488846566137859,
     "nav_class_id": "C000000091",
     "nav_status": "disclosed",
+    "nav_units": "percent",
     "nav_minus_frozen": -0.0014757509867439934,
     "net_flow_ratio": -0.00625771347397364
    },
@@ -623,6 +639,9 @@
     "benchmark_weight_unknown_return": 0.0,
     "unknown_returns_policy": "drop",
     "n_split_adjusted": 0,
+    "n_share_count_changed": 0,
+    "benchmark_weight_share_count_changed": 0.0,
+    "n_priced_outside_parent": 0,
     "n_universe": 59,
     "n_fund_holdings": 15,
     "n_fund_in_universe": 15,
@@ -634,7 +653,7 @@
     "fund_equity_share_of_net_assets": 0.9900000028244217,
     "parent_equity_share_of_net_assets": 0.9997944961799056,
     "sectors_known": false,
-    "max_price_disagreement": 2.220446049250313e-16
+    "max_return_disagreement_between_sources": 1.1102230246251565e-16
    },
    "realised": {
     "frozen_return": 0.040649633563209005,
@@ -643,6 +662,7 @@
     "nav_return": 0.039110014370548285,
     "nav_class_id": "C000000091",
     "nav_status": "disclosed",
+    "nav_units": "percent",
     "nav_minus_frozen": -0.0015396191926607197,
     "net_flow_ratio": -0.005963584558425053,
     "fund_tracking_error_same_units_as_cov": 0.016605019893470154

@@ -503,12 +503,12 @@ The design keeps Europe out of scope but does not block it:
 
 | # | Decision | Taken |
 |---|---|---|
-| 1 | SEC `User-Agent` contact | Read from the environment variable `FAIRBENCH_SEC_USER_AGENT`; no default, and the client refuses to run without it. **Still needs a value from the team**: nobody's email was put in a header on their behalf. |
+| 1 | SEC `User-Agent` contact | Read from the environment variable `FAIRBENCH_SEC_USER_AGENT`; no default, and the client refuses to run without it. On 2026-10-09 the user asked for their contact email to be used, and the first downloads were made with it. |
 | 2 | Returns source | Price returns implied by N-PORT (SEC-only) by default; a CSV adapter takes total returns from a licensed source. |
 | 3 | Headline reference distribution | Uniform subsets with benchmark-proportional weights **capped at the fund's own largest position**. The cap was added during the build: without it, 40 names drawn from a 500-name index give one very large company about half the portfolio. |
 | 4 | Label change | The new real-fund code uses the neutral labels. `apps/attribution.py` and the deck are untouched before the pitch. |
 | 5 | Fund list | The eight funds of §3.2 stand; the scripts take any series id. |
-| 6 | Fast path | Built as `scripts/real_fund_ingest.py` + `scripts/real_fund_attribution.py`; not run, pending decision 1. |
+| 6 | Fast path | Run on 2026-10-09 for Parnassus Core Equity; results in `results/real_fund_parnassus_core_equity*`. |
 | 7 | Dependencies | None added. The MILP baseline uses `scipy.optimize.milp`, already a dependency; PDF parsing imports `pypdf` only if called. |
 | 8 | Live model calls | Not made. Extraction is tested with a fake client. |
 | 9 | Standards research file | Restored from the Codex checkpoint and committed. |

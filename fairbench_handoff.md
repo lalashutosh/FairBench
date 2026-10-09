@@ -4,7 +4,7 @@ _Last updated 2026-10-09 (after the real-fund data layer, RD; before that the qu
 
 ## Start here (next session)
 
-**State of the repo.** `main` holds everything up to the QA wave (680 tests). The real-fund data layer (RD, below) is committed on branch `claude/fairbench-research-plan-368b64`, which is `main` plus new commits and fast-forwards cleanly; it is **not on `main` yet**. With it: 1,153 tests, all green, all offline. Run `git pull` before starting.
+**State of the repo.** `main` holds everything up to the QA wave (680 tests). The real-fund data layer (RD, below) is committed on branch `claude/fairbench-research-plan-368b64`, which is `main` plus new commits and fast-forwards cleanly; it is **not on `main` yet**. With it: 1162 tests, all green, all offline. Run `git pull` before starting.
 
 **What the last session did (2026-10-07 night → 2026-10-08 morning): a meaningful quantum angle (QA wave).**
 - **Idea:** the attribution outputs are Monte Carlo averages over the rule-abiding portfolios. The fund's percentile is a ratio of two amplitudes over the Dicke state, so **quantum amplitude estimation (QAE)** is the textbook route to a quadratic query advantage on exactly the quantity the tool reports.
@@ -24,15 +24,16 @@ _Last updated 2026-10-09 (after the real-fund data layer, RD; before that the qu
   - `fairbench/quantum/encoding.py`: the weight grid as a QUBO, proved exact and one-to-one by brute force on small cases; simulated annealing and an amplitude-amplification circuit as samplers on it.
   - `fairbench/constraints.py`: weight-level rules added (`PositionBound`, `WeightSum`, `WeightedAverage`, `WeightedRisk`, `HoldingsRange`, `TurnoverCap`, `WeightRuleSet`). Nothing existing was changed.
   - `fairbench/apps/real_fund.py` and `scripts/real_fund_{ingest,attribution}.py`, `validate_reference.py`, `build_example_dataset.py`, `reproducibility_report.py`.
-- **Run so far:** only the synthetic example in `examples/real_data_example/` and the small-universe validation. Results and the disclosed / derived / assumed / missing ledger: [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md).
-- **Not run:** any download from the SEC, any real fund, any live model call. The SEC client has never made a request.
+- **First real run (2026-10-09), Parnassus Core Equity vs S&P 500 portfolios, 2019-09-30 to 2026-06-30, 27 quarters, all from SEC filings** (downloaded with the user's contact email, at their request; raw files under git-ignored `data/`):
+  - Price growth of the fund's disclosed portfolios, held a quarter at a time: +135%. S&P 500 index fund: +149%. Typical 36-stock portfolio allowed by the same rules: +105% (+107% without the exclusions).
+  - Average quarterly percentile among rule-abiding portfolios: 54 with capped benchmark weights, 56 with equal weights. Random picks would average 50 give or take 5.6, so this is not distinguishable from 50.
+  - The team's own measure (each quarter's portfolio held unchanged until 2026-06-30): average percentile 61 / 67. These windows overlap almost entirely, so there is no error bar for that average and early quarters dominate it.
+  - Checks that came out well: the fund's reported NAV return differs from the return of its frozen holdings by +0.11 points a quarter on average (median -0.05); 0-9 index companies a quarter have no derivable return; 91-97% of the fund's equity weight sits in the S&P 500.
+  - Outputs: `results/real_fund_parnassus_core_equity.{json,csv,png}`, `_hold.csv`, `_summary.json`, `_exclusions.csv`. Figure for a slide: `results/real_fund_parnassus_core_equity.png`.
+  - **What must be said with it:** proxy mandate (holdings count plus 27 companies excluded by SEC industry code: fossil fuels, tobacco, one brewer, two weapons makers; most defence, casino and drinks companies are not caught, and the fund's own ESG research is not reproducible); price returns without dividends; one fund; not evidence of skill.
+- **Still not run:** any other fund, a real prospectus through the rule extractor (no live model call), quantum hardware.
 
-**To get the first real-fund result (about ten minutes once step 1 is done).**
-1. Set the SEC contact string. The SEC requires one; the client has no default: `export FAIRBENCH_SEC_USER_AGENT="Team Name contact@your-domain"`.
-2. `.venv/bin/python scripts/real_fund_ingest.py --series S000000856 --series S000004310` (Parnassus Core Equity and iShares Core S&P 500 as its universe; about 60 small requests).
-3. `.venv/bin/python scripts/real_fund_attribution.py --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --name parnassus_core_equity`
-4. Read the coverage lines before the percentiles: how much of the fund sits in the universe, how many returns are unknown, how many splits were adjusted. If the two funds report on different months, the script says so; pick a parent fund on the same fiscal cycle.
-5. On a slide, the result must carry: *proxy mandate (number of holdings and universe only, no ESG rule enforced); price returns without dividends; reference distribution named; not a measure of skill.*
+**To repeat or extend the real run.** `export FAIRBENCH_SEC_USER_AGENT="Name contact@domain"`, then the four commands in the README section "Real funds from public filings". Another fund needs its series id (memo §3) and a parent index fund that reports on the same months.
 
 **Do next, in this order.**
 1. **Run the AI layer against the real API.** It has never made a live call. Set `ANTHROPIC_API_KEY` in the shell (the user does this; never commit a key), then `.venv/bin/python scripts/demo_mandate.py --live`. It prints whether Claude's spec matches the hand-written reference and saves `results/mandate_rules_live.json`. Fix the prompt in `fairbench/mandate.py` if they differ.
@@ -45,7 +46,7 @@ _Last updated 2026-10-09 (after the real-fund data layer, RD; before that the qu
 5. **Optional:** optimizer pivot (`apps/optimizer.py`); hardware run (feasibility only); quantum-walk speedup of MCMC (not explored).
 
 **Decisions made by the assistant that the team has not confirmed.**
-- RD wave (2026-10-09, after "you decide"): the SEC contact is read from an environment variable and nobody's email was used; returns default to N-PORT-implied price returns; the headline reference is uniform subsets with benchmark-proportional weights capped at the fund's own largest position; the new code uses neutral labels ("within-mandate return difference", "realised portfolio percentile") while `apps/attribution.py` and the deck keep "manager effect" until after the pitch; the work was committed on the session branch, not pushed and not merged.
+- RD wave (2026-10-09, after "you decide"): the SEC contact is read from an environment variable (on 2026-10-09 the user asked for their email to be used, and it was); returns default to N-PORT-implied price returns; the headline reference is uniform subsets with benchmark-proportional weights capped at the fund's own largest position; the new code uses neutral labels ("within-mandate return difference", "realised portfolio percentile") while `apps/attribution.py` and the deck keep "manager effect" until after the pitch; the work was committed on the session branch, not pushed and not merged.
 - Benchmark = median random portfolio with the same k and no other rule (an index can be passed via `benchmark_returns`).
 - The model never sees per-asset values, only names and scales; all numbers are computed in code.
 - Shares of the portfolio and portfolio averages are read as equal-weight statements: a maximum share becomes floor(limit x k) names, a minimum share ceil(limit x k).
@@ -95,11 +96,11 @@ Team #22 "FairBench" at the Hanken Quantum x Finance Hackathon (8–10 Oct 2026)
 | AI mandate layer `mandate.py` + rule compiler `rules.py` (M) | Built, tested offline; **no live API call yet** |
 | Demos `scripts/demo_attribution.py`, `scripts/demo_mandate.py` | Done (`results/attribution_demo.*`, `attribution_samplers.csv`, `mandate_attribution.png`, `mandate_demo.json`) |
 | Pitch deck | First draft: https://claude.ai/artifact/Do4km8NeU9qw4oZvxEniJK (private until shared; team names are placeholders) |
-| **Real fund data** | Pipeline built and tested offline (RD wave); **no real filing downloaded yet, every result is still synthetic** |
+| **Real fund data** | Pipeline built (RD wave) and **run on one real fund, Parnassus Core Equity, under a proxy mandate**; everything else is still synthetic |
 | Optimizer pivot `apps/optimizer.py` | Not started (2-line stub) |
 | Hardware runs (`ibm` / `vtt` backends) | Stubs that raise `NotImplementedError` |
 
-Test suite: **1,153 tests, all green** (about a minute), all offline (680 before the RD wave).
+Test suite: **1162 tests, all green** (about a minute), all offline (680 before the RD wave).
 
 ### Key findings (use this wording in the pitch)
 

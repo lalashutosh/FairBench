@@ -1,6 +1,6 @@
 # Reproducibility report: real-data layer
 
-_Generated 2026-10-09 by `scripts/reproducibility_report.py` from commit `7ed0ca5`
+_Generated 2026-10-09 by `scripts/reproducibility_report.py` from commit `b336664`
 (branch `claude/fairbench-research-plan-368b64`). Do not edit by hand; re-run the script._
 
 ## What was and was not run
@@ -9,12 +9,12 @@ _Generated 2026-10-09 by `scripts/reproducibility_report.py` from commit `7ed0ca
 |---|---|
 | Synthetic worked example, end to end (parse, store, universe, returns, references, ranking) | **Run**, results below |
 | Samplers against exact distributions on small universes, classical and quantum (simulator) | **Run**, results below |
-| Live download from SEC EDGAR | **Not run.** The client needs `FAIRBENCH_SEC_USER_AGENT`; nobody has set it. The code path is tested offline against a fake transport. |
-| Any real fund | **Not run.** No real holdings have been ingested. Every number here is synthetic. |
+| Live download from SEC EDGAR | **Run** for the funds below, with a declared contact. Raw responses are kept under the git-ignored `data/raw`; the numbers in this report do not depend on them. |
+| A real fund | **Run, under a proxy mandate:** Parnassus Core Equity Fund (2019-09-30 to 2026-06-30). Results are in `results/real_fund_<name>*` and the README; this report covers only the synthetic example, whose answers are known. |
 | Live model call for mandate extraction | **Not run.** Tested with a fake client only. |
 | Quantum hardware | **Not run.** Simulator only. |
 
-The example data are fictional and labelled so in every file. They were generated with
+The example data below are fictional and labelled so in every file. They were generated with
 known values planted, so the pipeline's output can be checked against the truth.
 
 ## Environment

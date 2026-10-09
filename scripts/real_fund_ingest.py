@@ -35,6 +35,7 @@ def main() -> None:
     args = ap.parse_args()
 
     root = Path(args.data)
+    root.mkdir(parents=True, exist_ok=True)
     client = SecClient(RawArchive(root / "raw"), max_rps=args.max_rps)
     conn = db.open_db(root / "fairbench.sqlite")
     source = db.add_source(conn, name="SEC EDGAR", licence="public filings; SEC disclaims accuracy",

@@ -6,12 +6,13 @@ import pandas as pd
 import pytest
 
 from fairbench.apps.real_fund import (CAVEATS, build_period_case, history_table, keyed_sleeve, run_history,
-                                      run_period, single_index_cov)
+                                      run_hold_to_end, run_period, single_index_cov, summarise_percentiles)
 from fairbench.constraints import PositionBound, WeightRuleSet
 from fairbench.ingest.nport import parse_nport
 from fairbench.ingest.nport_synth import example_history
 from fairbench.ingest.pipeline import ingest_nport_document
-from fairbench.ingest.prices import CsvReturns, NportImpliedReturns, nav_period_return, net_flow_ratio
+from fairbench.ingest.prices import (ChainedReturns, CsvReturns, NportImpliedReturns, nav_period_return,
+                                     net_flow_ratio)
 from fairbench.store import db
 
 
@@ -61,22 +62,37 @@ def test_security_that_left_the_index_has_no_invented_return(ex):
         _case(ex, 3, unknown_returns="zero")
 
 
-def test_unexplained_share_jump_voids_the_return():
-    def snap(shares, price):
-        return pd.DataFrame({"security_key": [f"cusip:{i}" for i in range(6)], "balance": shares,
-                             "value_usd": np.asarray(shares) * np.asarray(price)})
+def _snap(shares, price):
+    return pd.DataFrame({"security_key": [f"cusip:{i}" for i in range(len(shares))], "balance": shares,
+                         "value_usd": np.asarray(shares, dtype=float) * np.asarray(price, dtype=float)})
+
+
+def test_share_count_changes_are_judged_by_what_the_price_did():
     a, b = date(2025, 3, 31), date(2025, 6, 30)
-    base = [100.0] * 6
-    src = NportImpliedReturns({a: snap(base, [10.0] * 6),
-                               b: snap([100, 100, 200, 170, 100, 105], [11, 9, 5.6, 10, 10, 10])})
-    r = src.period_returns([f"cusip:{i}" for i in range(6)] + ["cusip:zz"], a, b)
+    keys = [f"cusip:{i}" for i in range(7)]
+    #          plain  plain  2-for-1  +70% shares  plain  +5%   10x shares, price flat
+    shares1 = [100, 100, 200, 170, 100, 105, 1000]
+    price1 = [11, 9, 5.6, 10.5, 10, 10, 10]
+    src = NportImpliedReturns({a: _snap([100.0] * 7, [10.0] * 7), b: _snap(shares1, price1)})
+    r = src.period_returns(keys + ["cusip:zz"], a, b)
     assert r.loc["cusip:0", "ret"] == pytest.approx(0.10) and r.loc["cusip:1", "ret"] == pytest.approx(-0.10)
-    assert r.loc["cusip:2", "ret"] == pytest.approx(0.12) and r.loc["cusip:2", "split_adjusted"]     # 2-for-1
-    assert np.isnan(r.loc["cusip:3", "ret"]) and "no split explains it" in r.loc["cusip:3", "note"]  # 1.7x: unknown
-    assert r.loc["cusip:5", "ret"] == pytest.approx(0.0)        # a 5% share change is NOT detected (documented)
+    assert r.loc["cusip:2", "ret"] == pytest.approx(0.12) and r.loc["cusip:2", "split_adjusted"]          # split: price halved
+    # shares up 70% but the price did not fall: an issue or float change, plain return kept and labelled
+    assert r.loc["cusip:3", "ret"] == pytest.approx(0.05) and r.loc["cusip:3", "status"] == "assumed"
+    assert r.loc["cusip:3", "share_count_changed"] and not r.loc["cusip:3", "split_adjusted"]
+    assert r.loc["cusip:5", "ret"] == pytest.approx(0.0) and r.loc["cusip:5", "status"] == "derived"       # 5%: not flagged
+    assert r.loc["cusip:6", "status"] == "assumed"                                                         # 10x shares, flat price
     assert np.isnan(r.loc["cusip:zz", "ret"]) and r.loc["cusip:zz", "status"] == "unknown"
-    assert set(r.loc[r["ret"].notna(), "kind"]) == {"price"} and set(r.loc[r["ret"].notna(), "status"]) == {"derived"}
+    assert set(r.loc[r["ret"].notna(), "kind"]) == {"price"}
+    # the strict policy leaves those returns unknown instead
+    strict = NportImpliedReturns({a: _snap([100.0] * 7, [10.0] * 7), b: _snap(shares1, price1)}, share_change="void")
+    rs = strict.period_returns(keys, a, b)
+    assert np.isnan(rs.loc["cusip:3", "ret"]) and "no split explains it" in rs.loc["cusip:3", "note"]
+    assert rs.loc["cusip:2", "ret"] == pytest.approx(0.12)
     assert np.isnan(src.period_returns(["cusip:0"], a, date(2025, 9, 30)).loc["cusip:0", "ret"])
+    with pytest.raises(ValueError):
+        NportImpliedReturns({a: _snap([1.0], [1.0]), b: _snap([1.0], [1.0])},
+                            share_change="guess").period_returns(["cusip:0"], a, b)
 
 
 def test_flow_scaling_does_not_hide_a_split():
@@ -94,7 +110,7 @@ def test_flow_scaling_does_not_hide_a_split():
     assert r.loc["cusip:0", "ret"] == pytest.approx(0.0) and not r["split_adjusted"].drop("cusip:4").any()
 
 
-def test_fund_only_security_is_never_split_adjusted():
+def test_active_fund_prices_only_unchanged_positions_and_sources_chain():
     """A name only the active fund holds: its shares change by trading, so a doubling of
     shares with a falling price is NOT read as a split; the return is left unknown."""
     a, b = date(2025, 3, 31), date(2025, 6, 30)
@@ -102,12 +118,31 @@ def test_fund_only_security_is_never_split_adjusted():
     parent = lambda px: pd.DataFrame({"security_key": idx, "balance": 100.0, "value_usd": 100.0 * np.asarray(px)})
     fund = lambda sh, px: pd.DataFrame({"security_key": ["cusip:0", "cusip:x", "cusip:y"], "balance": sh,
                                         "value_usd": np.asarray(sh) * np.asarray(px)})
-    src = NportImpliedReturns({a: parent([10.0] * 5), b: parent([11.0] * 5)})
-    src.add({a: fund([50.0, 40.0, 40.0], [10.0, 20.0, 20.0]), b: fund([50.0, 80.0, 41.0], [11.0, 14.0, 22.0])})
-    r = src.period_returns(idx + ["cusip:x", "cusip:y"], a, b)
+    index_fund = NportImpliedReturns({a: parent([10.0] * 5), b: parent([11.0] * 5)}, name="parent index fund")
+    own = NportImpliedReturns({a: fund([50.0, 40.0, 40.0], [10.0, 20.0, 20.0]),
+                               b: fund([50.0, 80.0, 41.0], [11.05, 14.0, 22.0])}, name="the fund's own filings",
+                              passive=False)
+    chain = ChainedReturns([index_fund, own])
+    r = chain.period_returns(idx + ["cusip:x", "cusip:y"], a, b)
     assert np.isnan(r.loc["cusip:x", "ret"]) and "cannot be told from a split" in r.loc["cusip:x", "note"]
-    assert r.loc["cusip:y", "ret"] == pytest.approx(0.10) and not r.loc["cusip:y", "split_adjusted"]
-    assert r.loc["cusip:0", "ret"] == pytest.approx(0.10) and src.max_price_disagreement == pytest.approx(0.0)
+    assert r.loc["cusip:y", "ret"] == pytest.approx(0.10) and r.loc["cusip:y", "note"].startswith("the fund's own filings")
+    assert r.loc["cusip:0", "ret"] == pytest.approx(0.10) and r.loc["cusip:0", "note"].startswith("parent index fund")
+    assert chain.max_disagreement == pytest.approx(0.005)            # the two sources price cusip:0 half a point apart
+
+
+def test_nav_units_are_inferred_from_an_independent_estimate(ex):
+    """Some filings report monthly returns as fractions although the form asks for percent."""
+    import copy
+    rep = copy.copy(ex["fund"][ex["dates"][1]])
+    truth = ex["meta"]["periods"][0]["fund_frozen_price_return"]
+    as_filed = nav_period_return(rep, reference=truth)
+    assert as_filed["units"] == "percent" and as_filed["status"] == "disclosed"
+    rep.monthly_returns = rep.monthly_returns.assign(return_pct=rep.monthly_returns["return_pct"] / 100.0)
+    blind = nav_period_return(rep)
+    assert blind["units"] == "percent" and "not checked" in blind["note"] and abs(blind["nav_return"]) < 0.001
+    fixed = nav_period_return(rep, reference=truth)
+    assert fixed["units"] == "fraction (inferred)" and fixed["status"] == "derived"
+    assert fixed["nav_return"] == pytest.approx(as_filed["nav_return"], abs=1e-6)
 
 
 def test_csv_returns_adapter(tmp_path):
@@ -274,3 +309,39 @@ def test_fetch_series_goes_through_the_polite_client(ex, tmp_path):
     n = len(calls)
     assert all(s is None for _, s in fetch_series_nport(client, conn, "S000000002"))
     assert len(calls) == n + 1                                                    # only the listing is re-requested
+
+
+# ------------------------------------------------- hold to the end, and averages
+def test_hold_to_end_table(ex):
+    t = run_hold_to_end(ex["parent"], ex["fund"], excluded_keys=ex["meta"]["excluded_keys"], n_samples=1500, seed=2)
+    n_starts = len(ex["dates"]) - 1
+    assert len(t) == n_starts * 4 and set(t["reference"]) == {"any k names", "k names obeying the exclusions"}
+    assert set(t["weights"]) == {"equal", "benchmark_capped"} and (t["n_violations"] == 0).all()
+    assert t["percentile_1q"].between(0, 100).all() and t["percentile_to_end"].between(0, 100).all()
+    last = t[t["start"] == str(ex["dates"][-2])]
+    assert (last["quarters_to_end"] == 1).all()
+    assert last["percentile_1q"].tolist() == last["percentile_to_end"].tolist()        # one quarter left: same thing
+    assert (t["fund_holds_excluded"] == 0).all() and t["fund_weight_in_universe"].to_numpy() == pytest.approx(1.0)
+    ruled = t[t["reference"] == "k names obeying the exclusions"]
+    assert (ruled["n_eligible"].to_numpy() < t[t["reference"] == "any k names"]["n_eligible"].to_numpy()).all()
+    assert ruled["rule_conditioned_shift_1q"].mean() < 0                                 # excluded names were planted to earn more
+    first = t.iloc[0]
+    assert first["fund_return_1q"] == pytest.approx(ex["meta"]["periods"][0]["fund_frozen_price_return"], abs=2e-4)
+    assert first["quarters_to_end"] == n_starts and np.isfinite(first["fund_return_to_end"])
+
+    s = summarise_percentiles(t)
+    assert len(s) == 4 and (s["n_periods"] == n_starts).all()
+    assert s["se_if_random_1q"].iloc[0] == pytest.approx(28.87 / np.sqrt(n_starts))
+    assert ((s["mean_percentile_1q"] - 50) / s["se_if_random_1q"]).to_numpy() == pytest.approx(s["z_1q"].to_numpy())
+
+
+def test_path_values_drop_unknown_holdings_and_renormalise():
+    from fairbench.apps.real_fund import _path_values
+    W = np.array([[0.5, 0.5, 0.0], [0.0, 0.5, 0.5]])
+    R = np.array([[0.10, np.nan, 0.00], [0.20, 0.50, -0.10]])
+    v = _path_values(W, R)
+    # row 0: quarter 1 only asset 0 is known (+10%), asset 1 leaves; quarter 2 everything is in asset 0 (+20%)
+    assert v[0] == pytest.approx(1.10 * 1.20)
+    # row 1: quarter 1 only asset 2 is known (0%); quarter 2 all in asset 2 (-10%)
+    assert v[1] == pytest.approx(1.00 * 0.90)
+    assert _path_values(np.array([[1.0, 0.0, 0.0]]), np.array([[np.nan, 0.1, 0.1]]))[0] == pytest.approx(1.0)

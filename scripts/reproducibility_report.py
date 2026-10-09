@@ -78,6 +78,20 @@ def main() -> None:
     for c in ("n samples", "qubits", "depth", "shots"):
         vt_fmt[c] = lambda v: f"{int(v):,}"
 
+    real = sorted((ROOT / "results").glob("real_fund_*_summary.json"))
+    real = [json.loads(f.read_text()) for f in real]
+    real = [s for s in real if not s.get("synthetic")]
+    if real:
+        names = ", ".join(f"{s['fund']} ({s['first_start']} to {s['last_end']})" for s in real)
+        real_download = ("**Run** for the funds below, with a declared contact. Raw responses are kept under the "
+                         "git-ignored `data/raw`; the numbers in this report do not depend on them.")
+        real_fund = (f"**Run, under a proxy mandate:** {names}. Results are in `results/real_fund_<name>*` and the "
+                     "README; this report covers only the synthetic example, whose answers are known.")
+    else:
+        real_download = ("**Not run.** The client needs `FAIRBENCH_SEC_USER_AGENT`. The code path is tested offline "
+                         "against a fake transport.")
+        real_fund = "**Not run.** No real holdings have been ingested. Every number here is synthetic."
+
     text = f"""# Reproducibility report: real-data layer
 
 _Generated {date.today()} by `scripts/reproducibility_report.py` from commit `{_git('rev-parse', '--short', 'HEAD')}`
@@ -89,12 +103,12 @@ _Generated {date.today()} by `scripts/reproducibility_report.py` from commit `{_
 |---|---|
 | Synthetic worked example, end to end (parse, store, universe, returns, references, ranking) | **Run**, results below |
 | Samplers against exact distributions on small universes, classical and quantum (simulator) | **Run**, results below |
-| Live download from SEC EDGAR | **Not run.** The client needs `FAIRBENCH_SEC_USER_AGENT`; nobody has set it. The code path is tested offline against a fake transport. |
-| Any real fund | **Not run.** No real holdings have been ingested. Every number here is synthetic. |
+| Live download from SEC EDGAR | {real_download} |
+| A real fund | {real_fund} |
 | Live model call for mandate extraction | **Not run.** Tested with a fake client only. |
 | Quantum hardware | **Not run.** Simulator only. |
 
-The example data are fictional and labelled so in every file. They were generated with
+The example data below are fictional and labelled so in every file. They were generated with
 known values planted, so the pipeline's output can be checked against the truth.
 
 ## Environment

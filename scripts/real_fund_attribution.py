@@ -5,12 +5,21 @@
         --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --name parnassus_core_equity
 
 Inputs are directories of N-PORT XML files, one per report date (scripts/real_fund_ingest.py
-writes them). Optional --exclude-file: a CSV with a column security_key (and, for the
-record, reason, status, source) listing securities the mandate rules out.
+writes them). Optional:
+  --exclude-file  a CSV with a column security_key (and, for the record, reason, status,
+                  source) listing securities the mandate rules out
+                  (scripts/build_sic_exclusions.py writes one from SEC industry codes)
+  --price-dir     N-PORT files of a broader index fund (repeatable), used only to price
+                  securities the parent fund no longer holds
 
-Outputs in results/: real_fund_<name>.json (every period, every reference distribution,
-with its definition, sampler, seed, acceptance rate, estimated number of feasible
-portfolios and coverage) and real_fund_<name>.csv (one row per period).
+Outputs in results/:
+  real_fund_<name>.json          every quarter, every reference distribution, with its
+                                 definition, sampler, seed, acceptance rate, estimated number
+                                 of feasible portfolios and coverage
+  real_fund_<name>.csv           one row per quarter
+  real_fund_<name>_hold.csv      each quarter's portfolio held unchanged for one quarter and
+                                 until the last report date, with and without the exclusions
+  real_fund_<name>_summary.json  average percentiles and the yardstick for reading them
 
 Read the result as a descriptive rule-versus-choice comparison. It is not a causal
 decomposition and a percentile is not evidence of skill; the JSON carries the caveats.
@@ -23,7 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from fairbench.apps.real_fund import history_table, run_history
+from fairbench.apps.real_fund import history_table, run_history, run_hold_to_end, summarise_percentiles
 from fairbench.ingest.nport import parse_nport
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +52,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--example", action="store_true", help="run the synthetic example in examples/real_data_example")
     ap.add_argument("--fund-dir"), ap.add_argument("--parent-dir"), ap.add_argument("--exclude-file")
+    ap.add_argument("--price-dir", action="append", default=[], help="extra index fund N-PORT directory (repeatable)")
     ap.add_argument("--name", default=None), ap.add_argument("--samples", type=int, default=5000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--unknown-returns", default="drop", choices=["drop", "benchmark_fill"])
@@ -68,8 +78,9 @@ def main() -> None:
         only_f, only_p = sorted(set(fund) - set(parent)), sorted(set(parent) - set(fund))
         raise SystemExit("need two common report dates. The two funds report on different fiscal quarter-ends: "
                          f"fund-only {only_f[:4]}, parent-only {only_p[:4]}. Pick a parent fund on the same cycle.")
+    extra = [load_reports(Path(d)) for d in args.price_dir]
     results = run_history(parent, fund, excluded_keys=excluded, n_samples=args.samples, seed=args.seed,
-                          unknown_returns=args.unknown_returns)
+                          unknown_returns=args.unknown_returns, price_reports=extra)
     for res in results:
         print("\n" + res.summary())
     table = history_table(results)
@@ -83,7 +94,27 @@ def main() -> None:
           "(reference: uniform subsets, capped benchmark weights):")
     print(table[["period_end", "realised_frozen_return", "median", "p05", "p95",
                  "realised_portfolio_percentile", "percentile_se"]].to_string(index=False, float_format=lambda v: f"{v:.4f}"))
-    print(f"\nwrote results/real_fund_{name}.json and .csv")
+    hold = run_hold_to_end(parent, fund, price_reports=extra, excluded_keys=excluded, n_samples=args.samples,
+                           seed=args.seed)
+    hold.to_csv(out / f"real_fund_{name}_hold.csv", index=False)
+    summary = summarise_percentiles(hold)
+    (out / f"real_fund_{name}_summary.json").write_text(json.dumps(
+        {"synthetic": synthetic, "fund": results[0].case.fund_name, "universe_proxy": results[0].case.parent_name,
+         "first_start": hold["start"].min(), "last_end": hold["end"].max(), "n_excluded_keys": len(excluded),
+         "return_kind": results[0].case.return_kind, "by_reference": summary.to_dict(orient="records"),
+         "mean_rule_conditioned_shift_1q": (float(hold["rule_conditioned_shift_1q"].mean())
+                                            if "rule_conditioned_shift_1q" in hold else None),
+         "reading": "50 = the typical portfolio allowed by the same rules. One-quarter percentiles do not overlap; "
+                    "if the picks were no better than random, their average would be 50 give or take se_if_random_1q. "
+                    "Hold-to-end windows overlap, so their average has no such yardstick. Not evidence of skill."},
+        indent=1, default=float) + "\n")
+    print("\nAverage percentile of the fund's portfolio (50 = typical rule-abiding portfolio):")
+    print(summary.to_string(index=False, float_format=lambda v: f"{v:.1f}"))
+    if "rule_conditioned_shift_1q" in hold:
+        sh = hold[hold["reference"] != "any k names"].groupby("weights")["rule_conditioned_shift_1q"].mean()
+        print("Average one-quarter effect of the exclusions on a typical portfolio: "
+              + ", ".join(f"{w} weights {100 * v:+.2f}%" for w, v in sh.items()))
+    print(f"\nwrote results/real_fund_{name}.json, .csv, _hold.csv and _summary.json")
 
 
 if __name__ == "__main__":
