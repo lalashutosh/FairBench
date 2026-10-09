@@ -9,6 +9,10 @@ LinearThreshold).
 A selection is a binary vector x (length n); X is a (m, n) batch.
 Average-based constraints (MinESG, CarbonCap) use the equal-weight average
 over held assets. An EMPTY selection (no assets held) is INFEASIBLE for them.
+
+Weight rules (HoldingsRange, PositionBound, WeightSum, WeightedAverage, WeightedRisk,
+TurnoverCap, collected in a WeightRuleSet) are checked on a weight vector w instead; see the end of
+this file. They have no quantum encoding here (``quantum.encoding`` builds one).
 """
 from __future__ import annotations
 
@@ -263,3 +267,201 @@ class ConstraintSet:
             if isinstance(c, Exclusion):
                 ok[c.indices] = False
         return np.flatnonzero(ok)
+
+
+# ------------------------------------------------------------------ weights
+# Rules on a weight vector w (length n, w >= 0, sum 1); W is a (m, n) batch. An asset is
+# held iff w_i > WEIGHT_TOL. These are the forms a mandate states ("no position above 5%",
+# "at most 25% in one industry", "tracking error below 2%"); the classes above are their
+# equal-weight count forms. Risk rules are QUADRATIC in w and are never linearised.
+
+WEIGHT_TOL = 1e-9
+
+
+def _wbatch(W: np.ndarray) -> np.ndarray:
+    return np.atleast_2d(np.asarray(W, dtype=float))
+
+
+class _WBase:
+    def check_weight(self, w: np.ndarray, u: Universe) -> bool:
+        return bool(self.check_weights(np.asarray(w, dtype=float)[None, :], u)[0])
+
+    def check_weights(self, W: np.ndarray, u: Universe) -> np.ndarray:
+        raise NotImplementedError
+
+
+def _between(v: np.ndarray, lo: float | None, hi: float | None) -> np.ndarray:
+    ok = np.ones(v.shape, dtype=bool)
+    if lo is not None:
+        ok &= v >= lo - WEIGHT_TOL
+    if hi is not None:
+        ok &= v <= hi + WEIGHT_TOL
+    return ok
+
+
+class HoldingsRange(_WBase):
+    """k_min <= number of held assets <= k_max."""
+
+    def __init__(self, k_min: int, k_max: int | None = None):
+        self.k_min = int(k_min)
+        self.k_max = self.k_min if k_max is None else int(k_max)
+        if not 0 <= self.k_min <= self.k_max:
+            raise ValueError(f"need 0 <= k_min <= k_max; got {self.k_min}, {self.k_max}")
+
+    def check_weights(self, W, u):
+        cnt = (_wbatch(W) > WEIGHT_TOL).sum(axis=1)
+        return (cnt >= self.k_min) & (cnt <= self.k_max)
+
+
+class PositionBound(_WBase):
+    """lower <= w_i <= upper for every HELD asset. ``lower`` is a minimum position size:
+    an asset that is not held (w_i = 0) does not breach it."""
+
+    def __init__(self, lower: float = 0.0, upper: float = 1.0):
+        if not 0.0 <= lower <= upper <= 1.0:
+            raise ValueError(f"need 0 <= lower <= upper <= 1; got {lower}, {upper}")
+        self.lower, self.upper = float(lower), float(upper)
+
+    def check_weights(self, W, u):
+        W = _wbatch(W)
+        held = W > WEIGHT_TOL
+        return np.all(~held | ((W >= self.lower - WEIGHT_TOL) & (W <= self.upper + WEIGHT_TOL)), axis=1)
+
+
+class WeightSum(_WBase):
+    """lower <= total weight of the assets in ``indices`` <= upper (None = open): a sector,
+    country or flagged-group weight limit."""
+
+    def __init__(self, indices: Sequence[int], lower: float | None = None, upper: float | None = None,
+                 label: str = ""):
+        if lower is None and upper is None:
+            raise ValueError("WeightSum needs a lower or an upper bound")
+        self.indices = np.asarray(list(indices), dtype=int)
+        self.lower = None if lower is None else float(lower)
+        self.upper = None if upper is None else float(upper)
+        self.label = label
+
+    def check_weights(self, W, u):
+        return _between(_wbatch(W)[:, self.indices].sum(axis=1), self.lower, self.upper)
+
+
+class WeightedAverage(_WBase):
+    """lower <= sum_i w_i v_i <= upper, e.g. a weighted ESG floor or carbon-intensity cap.
+    ``values`` is an (n,) array or the name of a numeric field of the universe.
+    A missing value (NaN) is never read as zero: with ``missing="ineligible"`` (default) a
+    portfolio holding an asset with no value fails; with ``missing="renormalise"`` the
+    average is taken over the covered weight, and a portfolio with no covered weight fails."""
+
+    MISSING = ("ineligible", "renormalise")
+
+    def __init__(self, values, lower: float | None = None, upper: float | None = None,
+                 missing: str = "ineligible", label: str = ""):
+        if lower is None and upper is None:
+            raise ValueError("WeightedAverage needs a lower or an upper bound")
+        if missing not in self.MISSING:
+            raise ValueError(f"missing must be one of {self.MISSING}, got {missing!r}")
+        self.values = values
+        self.lower = None if lower is None else float(lower)
+        self.upper = None if upper is None else float(upper)
+        self.missing, self.label = missing, label
+
+    def _values(self, u: Universe) -> np.ndarray:
+        if isinstance(self.values, str):
+            v = u.numeric(self.values)
+            if v is None:
+                raise KeyError(f"universe has no numeric attribute {self.values!r}")
+            return v
+        return np.asarray(self.values, dtype=float)
+
+    def average(self, W, u) -> np.ndarray:
+        """(m,) weighted average; NaN where it cannot be evaluated under ``missing``."""
+        W, v = _wbatch(W), self._values(u)
+        known = ~np.isnan(v)
+        tot = W[:, known] @ v[known]
+        uncovered = W[:, ~known].sum(axis=1)
+        if self.missing == "ineligible":
+            return np.where(uncovered > WEIGHT_TOL, np.nan, tot)
+        covered = 1.0 - uncovered
+        return np.where(covered > WEIGHT_TOL, tot / np.where(covered > WEIGHT_TOL, covered, 1.0), np.nan)
+
+    def check_weights(self, W, u):
+        a = self.average(W, u)
+        ok = ~np.isnan(a)
+        ok[ok] = _between(a[ok], self.lower, self.upper)
+        return ok
+
+
+def active_risk(W: np.ndarray, cov: np.ndarray, benchmark: np.ndarray | None = None) -> np.ndarray:
+    """(m,) sqrt((w - b)' cov (w - b)); b = None gives absolute volatility sqrt(w' cov w)."""
+    D = _wbatch(W) if benchmark is None else _wbatch(W) - np.asarray(benchmark, dtype=float)[None, :]
+    return np.sqrt(np.maximum(np.einsum("ij,jk,ik->i", D, np.asarray(cov, dtype=float), D), 0.0))
+
+
+class WeightedRisk(_WBase):
+    """sqrt((w - b)' cov (w - b)) <= max_risk for the actual weights; ``benchmark`` None
+    means absolute volatility. Quadratic in w."""
+
+    cost = 2
+
+    def __init__(self, max_risk: float, benchmark: Sequence[float] | None = None, label: str = ""):
+        self.max_risk = float(max_risk)
+        self.benchmark = None if benchmark is None else np.asarray(benchmark, dtype=float)
+        self.label = label
+
+    def risk(self, W, u) -> np.ndarray:
+        return active_risk(W, u.cov, self.benchmark)
+
+    def check_weights(self, W, u):
+        return self.risk(W, u) <= self.max_risk + WEIGHT_TOL
+
+
+class TurnoverCap(_WBase):
+    """One-way turnover 0.5 * sum_i |w_i - previous_i| <= max_turnover against the previous
+    weights (linear after splitting each change into a buy and a sell)."""
+
+    def __init__(self, previous: Sequence[float], max_turnover: float, label: str = ""):
+        self.previous = np.asarray(previous, dtype=float)
+        self.max_turnover = float(max_turnover)
+        self.label = label
+
+    def turnover(self, W, u=None) -> np.ndarray:
+        return 0.5 * np.abs(_wbatch(W) - self.previous[None, :]).sum(axis=1)
+
+    def check_weights(self, W, u):
+        return self.turnover(W) <= self.max_turnover + WEIGHT_TOL
+
+
+class WeightRuleSet:
+    """AND of weight rules, plus optional selection rules (a ``ConstraintSet`` such as
+    exclusions or minimum sector counts) applied to the set of held assets."""
+
+    def __init__(self, rules: Sequence[_WBase] = (), support_rules: ConstraintSet | None = None):
+        self.rules = list(rules)
+        self.support_rules = support_rules
+
+    def check_weight(self, w: np.ndarray, u: Universe) -> bool:
+        return bool(self.check_weights(np.asarray(w, dtype=float)[None, :], u)[0])
+
+    def check_weights(self, W: np.ndarray, u: Universe) -> np.ndarray:
+        W = _wbatch(W)
+        ok = np.all(W >= -WEIGHT_TOL, axis=1) & (np.abs(W.sum(axis=1) - 1.0) <= 1e-6)
+        if self.support_rules is not None and ok.any():
+            idx = np.flatnonzero(ok)
+            ok[idx] = self.support_rules.check_batch((W[idx] > WEIGHT_TOL).astype(np.uint8), u)
+        for r in sorted(self.rules, key=lambda r: getattr(r, "cost", 0)):
+            idx = np.flatnonzero(ok)
+            if idx.size == 0:
+                break
+            ok[idx] = r.check_weights(W[idx], u)
+        return ok
+
+    def violations(self, W: np.ndarray, u: Universe) -> dict[str, int]:
+        """Rows breaking each rule, counted independently (label or class name -> count)."""
+        W = _wbatch(W)
+        out: dict[str, int] = {}
+        if self.support_rules is not None:
+            out["support_rules"] = int((~self.support_rules.check_batch((W > WEIGHT_TOL).astype(np.uint8), u)).sum())
+        for i, r in enumerate(self.rules):
+            name = f"{i}:{getattr(r, 'label', '') or type(r).__name__}"
+            out[name] = int((~r.check_weights(W, u)).sum())
+        return out

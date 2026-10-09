@@ -1,6 +1,8 @@
 # FairBench on real US funds: research memo and implementation plan
 
-_Written 2026-10-08. Status: **proposal, awaiting approval. No code has been changed.**_
+_Written 2026-10-08 as a proposal. **Update 2026-10-09:** the team delegated the open decisions and the plan was
+built (stages A to H of §12, offline). §14 lists the decisions as they were taken. What was built and what has
+not been run is in [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) and the handoff. The research findings below are unchanged._
 _Inputs read: `README.md`, `PITCH_PLAN.md`, `fairbench_handoff.md`, `FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md` (see note in §1), and the code in `fairbench/` (constraints, rules, mandate, data, baselines, postprocess, attribution, quantum, ft, qae)._
 
 How to read the evidence labels in this memo: **verified** means I checked it against the named source in this session; **to verify** means it is from memory or a secondary source and must be confirmed at ingestion. Nothing marked "to verify" should be quoted as fact.
@@ -496,6 +498,22 @@ The design keeps Europe out of scope but does not block it:
 ---
 
 ## 14. Open decisions
+
+**Taken on 2026-10-09** (the team said "you decide"; each can be reversed):
+
+| # | Decision | Taken |
+|---|---|---|
+| 1 | SEC `User-Agent` contact | Read from the environment variable `FAIRBENCH_SEC_USER_AGENT`; no default, and the client refuses to run without it. **Still needs a value from the team**: nobody's email was put in a header on their behalf. |
+| 2 | Returns source | Price returns implied by N-PORT (SEC-only) by default; a CSV adapter takes total returns from a licensed source. |
+| 3 | Headline reference distribution | Uniform subsets with benchmark-proportional weights **capped at the fund's own largest position**. The cap was added during the build: without it, 40 names drawn from a 500-name index give one very large company about half the portfolio. |
+| 4 | Label change | The new real-fund code uses the neutral labels. `apps/attribution.py` and the deck are untouched before the pitch. |
+| 5 | Fund list | The eight funds of §3.2 stand; the scripts take any series id. |
+| 6 | Fast path | Built as `scripts/real_fund_ingest.py` + `scripts/real_fund_attribution.py`; not run, pending decision 1. |
+| 7 | Dependencies | None added. The MILP baseline uses `scipy.optimize.milp`, already a dependency; PDF parsing imports `pypdf` only if called. |
+| 8 | Live model calls | Not made. Extraction is tested with a fake client. |
+| 9 | Standards research file | Restored from the Codex checkpoint and committed. |
+
+The original list, for the record:
 
 1. **SEC `User-Agent` contact.** Required. Format: organisation or project name and a monitored email.
 2. **Returns source.** (a) SEC-implied quarter-end prices, no dividends: free, redistributable, approximate. (b) A licensed daily source: accurate, not redistributable. (c) Both, with (a) as the public example and (b) as the working data. I recommend (c) if you have access to one.

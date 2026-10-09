@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC document: hand-written, fictional registrant and positions. Not a real filing. -->
+<edgarSubmission xmlns="http://www.sec.gov/edgar/nport" xmlns:com="http://www.sec.gov/edgar/common" xmlns:ncom="http://www.sec.gov/edgar/nportcommon" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <headerData>
+    <submissionType>NPORT-P</submissionType>
+    <isConfidential>false</isConfidential>
+    <filerInfo>
+      <filer>
+        <issuerCredentials>
+          <cik>0000000001</cik>
+          <ccc>XXXXXXXX</ccc>
+        </issuerCredentials>
+      </filer>
+      <seriesClassInfo>
+        <seriesId>S000000001</seriesId>
+        <classId>C000000001</classId>
+        <classId>C000000002</classId>
+      </seriesClassInfo>
+    </filerInfo>
+  </headerData>
+  <formData>
+    <genInfo>
+      <regName>Synthetic Example Trust (not a real fund)</regName>
+      <regFileNumber>811-00000</regFileNumber>
+      <regCik>0000000001</regCik>
+      <regLei>SYNTHETICLEI00000001</regLei>
+      <regStreet1>1 Fictional Way</regStreet1>
+      <regStreet2></regStreet2>
+      <regCity>Nowhere</regCity>
+      <regStateConditional regCountry="US" regState="US-NY"/>
+      <regZipOrPostalCode>00000</regZipOrPostalCode>
+      <regPhone>000-000-0000</regPhone>
+      <seriesName>Synthetic Example Fund (not a real fund)</seriesName>
+      <seriesId>S000000001</seriesId>
+      <seriesLei>SYNTHETICLEI00000002</seriesLei>
+      <repPdEnd>2026-09-30</repPdEnd>
+      <repPdDate>2026-03-31</repPdDate>
+      <isFinalFiling>N</isFinalFiling>
+    </genInfo>
+    <fundInfo>
+      <totAssets>10050000.00</totAssets>
+      <totLiabs>50000.00</totLiabs>
+      <netAssets>10000000.00</netAssets>
+      <assetsAttrMiscSec>25000.00</assetsAttrMiscSec>
+      <assetsInvested>0.00</assetsInvested>
+      <amtPayOneYrBanksBorr>0.00</amtPayOneYrBanksBorr>
+      <cshNotRptdInCorD>15000.00</cshNotRptdInCorD>
+      <returnInfo>
+        <monthlyTotReturns>
+          <monthlyTotReturn classId="C000000001" rtn1="1.25" rtn2="-0.75" rtn3="2.5"/>
+          <monthlyTotReturn classId="C000000002" rtn1="1.20" rtn2="N/A" rtn3="2.45"/>
+        </monthlyTotReturns>
+        <monthlyReturnCats>
+          <monthlyReturnCat assetCat="EC" netRealizedGainMon1="1.0" netUnrealizedApprMon1="2.0"/>
+        </monthlyReturnCats>
+        <othMon1 netRealizedGain="1000.00" netUnrealizedAppr="2000.00"/>
+        <othMon2 netRealizedGain="-500.00" netUnrealizedAppr="1500.50"/>
+        <othMon3 netRealizedGain="0.00" netUnrealizedAppr="-250.25"/>
+      </returnInfo>
+      <mon1Flow redemption="40000.00" reinvestment="5000.00" sales="100000.00"/>
+      <mon2Flow redemption="30000.00" sales="120000.00"/>
+      <mon3Flow redemption="50000.00" reinvestment="4000.00" sales="90000.00"/>
+    </fundInfo>
+    <invstOrSecs>
+      <invstOrSec>
+        <name>Alpha Widgets Inc (fictional)</name>
+        <lei>SYNTHETICLEI00000011</lei>
+        <title>Alpha Widgets Inc Common Stock</title>
+        <cusip>ZZ0000011</cusip>
+        <identifiers>
+          <isin value="US0000000011"/>
+        </identifiers>
+        <balance>10000.00</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>2500000.00</valUSD>
+        <pctVal>25.0</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>Beta Software Corp (fictional)</name>
+        <lei>SYNTHETICLEI00000012</lei>
+        <title>Beta Software Corp Common Stock</title>
+        <cusip>ZZ0000028</cusip>
+        <identifiers>
+          <ticker value="BETA"/>
+          <ticker value="BETA.B"/>
+          <other otherDesc="SEDOL" value="B000001"/>
+        </identifiers>
+        <balance>8000.00</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>2000000.00</valUSD>
+        <pctVal>20.0</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>Gamma Maschinenbau AG (fictional)</name>
+        <lei>SYNTHETICLEI00000013</lei>
+        <title>Gamma Maschinenbau AG Ordinary Shares</title>
+        <cusip>ZZ0000036</cusip>
+        <identifiers>
+          <isin value="DE0000000013"/>
+        </identifiers>
+        <balance>5000.00</balance>
+        <units>NS</units>
+        <currencyConditional curCd="EUR" exchangeRt="0.92"/>
+        <valUSD>1500000.00</valUSD>
+        <pctVal>15.0</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>DE</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+        <fairValLevel>2</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>Synthetic Cash Reserves Fund (fictional)</name>
+        <lei>SYNTHETICLEI00000014</lei>
+        <title>Synthetic Cash Reserves Fund Shares</title>
+        <cusip>ZZ0000044</cusip>
+        <identifiers>
+          <ticker value="SCRXX"/>
+        </identifiers>
+        <balance>1000000.00</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>1000000.00</valUSD>
+        <pctVal>10.0</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>STIV</assetCat>
+        <issuerCat>RF</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>Delta Retail Holdings (fictional)</name>
+        <lei>SYNTHETICLEI00000015</lei>
+        <title>Delta Retail Holdings Common Stock</title>
+        <cusip>ZZ0000051</cusip>
+        <identifiers>
+          <isin value="US0000000051"/>
+          <ticker value="DLTA"/>
+        </identifiers>
+        <balance>6000.00</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>1800000.00</valUSD>
+        <pctVal>18.0</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+        <isRestrictedSec>N</isRestrictedSec>
+        <fairValLevel>1</fairValLevel>
+        <securityLending>
+          <cashCollateralCondition isCashCollateral="Y" cashCollateralVal="460000.00"/>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <loanByFundCondition isLoanByFund="Y" loanVal="450000.00"/>
+        </securityLending>
+      </invstOrSec>
+      <invstOrSec>
+        <name>Epsilon Private Placement LLC (fictional)</name>
+        <lei>N/A</lei>
+        <title>Epsilon Private Placement Units</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <other otherDesc="Internal fund code" value="EPS-PP-1"/>
+        </identifiers>
+        <balance>1.00</balance>
+        <units>OU</units>
+        <curCd>USD</curCd>
+        <valUSD>700000.00</valUSD>
+        <pctVal>7.0</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetConditional desc="Private placement unit" assetCat="OTHER"/>
+        <issuerConditional desc="Special purpose vehicle" issuerCat="OTHER"/>
+        <invCountry>KY</invCountry>
+        <isRestrictedSec>Y</isRestrictedSec>
+        <fairValLevel>3</fairValLevel>
+        <derivativeInfo>
+          <optionSwaptionWarrantDeriv derivCat="WAR">
+            <putOrCall>Call</putOrCall>
+          </optionSwaptionWarrantDeriv>
+        </derivativeInfo>
+        <securityLending>
+          <isCashCollateral>N</isCashCollateral>
+          <isNonCashCollateral>N</isNonCashCollateral>
+          <isLoanByFund>N</isLoanByFund>
+        </securityLending>
+      </invstOrSec>
+    </invstOrSecs>
+    <signature>
+      <dateSigned>2026-05-28</dateSigned>
+      <nameOfApplicant>Synthetic Example Trust (not a real fund)</nameOfApplicant>
+      <signature>Synthetic Signer</signature>
+      <signerName>Synthetic Signer</signerName>
+      <title>Treasurer</title>
+    </signature>
+  </formData>
+</edgarSubmission>

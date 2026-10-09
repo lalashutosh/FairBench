@@ -30,6 +30,8 @@ fund - benchmark = (same-rules median - benchmark)   constraint effect: what the
 ## Status, stated plainly
 
 - **All attribution results so far use synthetic data** with a planted ground truth. No real fund has been analysed.
+  The pipeline for real US funds (SEC filings to reference distributions) is built and tested offline, but it has
+  never downloaded a real filing: that needs a contact string only the team can supply.
 - **No quantum speedup was found.** Three routes were benchmarked against strong classical baselines:
 
 | Route | Result |
@@ -156,6 +158,64 @@ The universe CSV supplies the data the rules refer to: `flag_<name>` columns (ye
 involvement), `attr_<name>` columns (numbers such as market cap) and `cat_<name>` columns
 (labels such as country). Shares and averages assume equally weighted holdings.
 
+## Real funds from public filings
+
+Built and tested offline; **not yet run on a real fund** (see the status line below).
+
+```
+SEC EDGAR --polite client, raw archive--> N-PORT holdings --> database (every row cites its filing)
+index fund's filing --> universe + benchmark weights        fund's filing --> realised portfolio
+two filings --> price returns --> reference portfolios under the same rules --> percentile
+```
+
+Try it on the synthetic example (fictional funds, a few seconds, no network):
+
+```bash
+.venv/bin/python scripts/build_example_dataset.py
+```
+
+```bash
+.venv/bin/python scripts/real_fund_attribution.py --example
+```
+
+Run it on a real fund. This is the only step that contacts the SEC, and it needs you to say who
+is asking (the SEC requires a contact in the `User-Agent`; the client has no default and will not
+start without it):
+
+```bash
+export FAIRBENCH_SEC_USER_AGENT="Your Project Name contact@your-domain.org"
+```
+
+```bash
+.venv/bin/python scripts/real_fund_ingest.py --series S000000856 --series S000004310
+```
+
+```bash
+.venv/bin/python scripts/real_fund_attribution.py --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --name parnassus_core_equity
+```
+
+`S000000856` is Parnassus Core Equity and `S000004310` is iShares Core S&P 500, used as the
+stand-in for its universe and benchmark weights. Other candidates and their identifiers are in
+[`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md`](FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md).
+
+What the output means:
+
+- The fund's **frozen-holdings return** (its disclosed portfolio, held without trading for one
+  quarter) is ranked among portfolios drawn from the same universe under the same rules.
+- Three **reference distributions** are reported side by side, because they are different
+  objects: uniform over feasible sets of names (equal or benchmark-proportional weights),
+  uniform over a grid of feasible weights, and a benchmark-aware tilt of either.
+- The words are deliberately plain: *rule-conditioned return range*, *within-mandate return
+  difference*, *realised portfolio percentile*. It is a descriptive comparison, not a causal
+  split, and a percentile is not evidence of skill.
+- Returns default to **price returns derived from the filings themselves** (value / shares at two
+  dates), so dividends are missing. A total-return file can be supplied instead.
+- Rules that need data the public does not have (vendor ESG ratings, provider emissions data)
+  are recorded with their evidence, marked `unobservable`, and never enforced.
+
+[`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) has the worked example, the samplers scored against
+exact distributions, and the list of what is disclosed, derived, assumed and missing.
+
 ## Using it on your own data
 
 ```python
@@ -199,8 +259,15 @@ fairbench/
   mandate.py                                AI layer: mandate text to rule spec (Claude)
   quantum/                                  Dicke state, XY mixer ansatz, Hamiltonians, MCMC proposal
   ft/                                       fault-tolerant oracle and resource model (amplitude amplification)
-  apps/attribution.py                       the attribution tool
-examples/                                   a fictional mandate and its reference rule spec
+  apps/attribution.py                       the attribution tool (synthetic universes)
+  apps/real_fund.py                         a real fund against its feasible portfolios, period by period
+  ingest/                                   SEC client and raw archive, N-PORT and EDGAR parsers, identifiers,
+                                            document parser, return sources, ingestion pipeline
+  store/                                    SQLite schema and helpers; every row carries its provenance
+  mandates/                                 canonical constraints: hard/soft wording, evidence checks, compilers
+  portfolio/                                weight grid, reference distributions, exact validator, MILP, holdings changes
+  quantum/encoding.py                       Stage 2 (weights) as binary variables and a QUBO
+examples/                                   a fictional mandate and its rule spec; a synthetic N-PORT example
 scripts/                                    demos and the benchmark studies
 results/                                    CSV, JSON and plots produced by the scripts
 tests/                                      pytest suite

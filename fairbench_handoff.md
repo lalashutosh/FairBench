@@ -1,10 +1,10 @@
 # FairBench — handoff
 
-_Last updated 2026-10-08 (after the quantum amplitude estimation wave, QA). Repo: `https://github.com/lalashutosh/FairBench.git`. Detailed wave-by-wave log and numbers: [`BUILD_PLAN.md`](BUILD_PLAN.md); pitch schedule: [`PITCH_PLAN.md`](PITCH_PLAN.md)._
+_Last updated 2026-10-09 (after the real-fund data layer, RD; before that the quantum amplitude estimation wave, QA). Repo: `https://github.com/lalashutosh/FairBench.git`. Detailed wave-by-wave log and numbers: [`BUILD_PLAN.md`](BUILD_PLAN.md); pitch schedule: [`PITCH_PLAN.md`](PITCH_PLAN.md)._
 
 ## Start here (next session)
 
-**State of the repo.** Everything is on `main` (the `quantum-qae` branch was fast-forwarded into it on 2026-10-08). Run `git pull` before starting. 680 tests, all green, all offline.
+**State of the repo.** `main` holds everything up to the QA wave (680 tests). The real-fund data layer (RD, below) is committed on branch `claude/fairbench-research-plan-368b64`, which is `main` plus new commits and fast-forwards cleanly; it is **not on `main` yet**. With it: 1,153 tests, all green, all offline. Run `git pull` before starting.
 
 **What the last session did (2026-10-07 night → 2026-10-08 morning): a meaningful quantum angle (QA wave).**
 - **Idea:** the attribution outputs are Monte Carlo averages over the rule-abiding portfolios. The fund's percentile is a ratio of two amplitudes over the Dicke state, so **quantum amplitude estimation (QAE)** is the textbook route to a quadratic query advantage on exactly the quantity the tool reports.
@@ -14,7 +14,25 @@ _Last updated 2026-10-08 (after the quantum amplitude estimation wave, QA). Repo
 - **Reviews:** three independent read-only reviews. All findings fixed, including fair classical baselines (swap-MCMC, shared samples, enumeration), charging every quantum shot, and no use of true amplitudes to set parameters.
 - **Headline (finding #8 below):** quadratically fewer queries in noiseless simulation, robust where tight mandates fragment the feasible set. No advantage on today's hardware, and no wall-clock advantage even fault-tolerant.
 
-**Real US fund data (started 2026-10-08 evening).** Plan and research: [`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md`](FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md) (SEC sources, eight candidate funds with SEC identifiers, data gaps, schema, constraint DSL, three reference distributions, staged build plan). Market and standards context: [`FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md`](FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md) (written in a Codex session; it existed only in Codex checkpoint refs until it was restored into the repo on 2026-10-08).
+**What the last session did (2026-10-08 night → 2026-10-09): the real-fund data layer (RD wave).**
+- **Research and plan:** [`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md`](FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md) (SEC sources, eight candidate funds with SEC identifiers, data gaps, schema, constraint format, three reference distributions, legal risks; §14 records the decisions taken). Market context: [`FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md`](FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md), written in a Codex session and restored from Codex checkpoint refs, where it was the only copy.
+- **Built, all tested offline:**
+  - `fairbench/ingest/`: polite SEC client (declared `User-Agent` from `FAIRBENCH_SEC_USER_AGENT`, ≤ 2 requests/s, conditional requests, backoff, SEC hosts only) with a raw archive; EDGAR listing and N-PORT parsers; identifier normaliser; prospectus document parser with quote locations; return sources; the ingestion pipeline.
+  - `fairbench/store/`: SQLite schema v1; every fact row carries document, locator, extraction run, confidence and a disclosed / derived / assumed / unknown status.
+  - `fairbench/mandates/`: canonical constraint record; hard/soft wording by a fixed word list; quote, number and date checks; a selection policy (nothing is enforced before a named review); compilers to Stage 1 (`rules.compile_spec`) and Stage 2 (weight rules).
+  - `fairbench/portfolio/`: weight grid (Stage 2) with exact counting and sampling; reference distributions D1 (uniform subsets), D2 (uniform weight grid), D3 (benchmark-aware tilt); exact small-universe validator and metrics; MILP baseline; holdings-change calculator.
+  - `fairbench/quantum/encoding.py`: the weight grid as a QUBO, proved exact and one-to-one by brute force on small cases; simulated annealing and an amplitude-amplification circuit as samplers on it.
+  - `fairbench/constraints.py`: weight-level rules added (`PositionBound`, `WeightSum`, `WeightedAverage`, `WeightedRisk`, `HoldingsRange`, `TurnoverCap`, `WeightRuleSet`). Nothing existing was changed.
+  - `fairbench/apps/real_fund.py` and `scripts/real_fund_{ingest,attribution}.py`, `validate_reference.py`, `build_example_dataset.py`, `reproducibility_report.py`.
+- **Run so far:** only the synthetic example in `examples/real_data_example/` and the small-universe validation. Results and the disclosed / derived / assumed / missing ledger: [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md).
+- **Not run:** any download from the SEC, any real fund, any live model call. The SEC client has never made a request.
+
+**To get the first real-fund result (about ten minutes once step 1 is done).**
+1. Set the SEC contact string. The SEC requires one; the client has no default: `export FAIRBENCH_SEC_USER_AGENT="Team Name contact@your-domain"`.
+2. `.venv/bin/python scripts/real_fund_ingest.py --series S000000856 --series S000004310` (Parnassus Core Equity and iShares Core S&P 500 as its universe; about 60 small requests).
+3. `.venv/bin/python scripts/real_fund_attribution.py --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --name parnassus_core_equity`
+4. Read the coverage lines before the percentiles: how much of the fund sits in the universe, how many returns are unknown, how many splits were adjusted. If the two funds report on different months, the script says so; pick a parent fund on the same fiscal cycle.
+5. On a slide, the result must carry: *proxy mandate (number of holdings and universe only, no ESG rule enforced); price returns without dividends; reference distribution named; not a measure of skill.*
 
 **Do next, in this order.**
 1. **Run the AI layer against the real API.** It has never made a live call. Set `ANTHROPIC_API_KEY` in the shell (the user does this; never commit a key), then `.venv/bin/python scripts/demo_mandate.py --live`. It prints whether Claude's spec matches the hand-written reference and saves `results/mandate_rules_live.json`. Fix the prompt in `fairbench/mandate.py` if they differ.
@@ -27,6 +45,7 @@ _Last updated 2026-10-08 (after the quantum amplitude estimation wave, QA). Repo
 5. **Optional:** optimizer pivot (`apps/optimizer.py`); hardware run (feasibility only); quantum-walk speedup of MCMC (not explored).
 
 **Decisions made by the assistant that the team has not confirmed.**
+- RD wave (2026-10-09, after "you decide"): the SEC contact is read from an environment variable and nobody's email was used; returns default to N-PORT-implied price returns; the headline reference is uniform subsets with benchmark-proportional weights capped at the fund's own largest position; the new code uses neutral labels ("within-mandate return difference", "realised portfolio percentile") while `apps/attribution.py` and the deck keep "manager effect" until after the pitch; the work was committed on the session branch, not pushed and not merged.
 - Benchmark = median random portfolio with the same k and no other rule (an index can be passed via `benchmark_returns`).
 - The model never sees per-asset values, only names and scales; all numbers are computed in code.
 - Shares of the portfolio and portfolio averages are read as equal-weight statements: a maximum share becomes floor(limit x k) names, a minimum share ceil(limit x k).
@@ -76,11 +95,11 @@ Team #22 "FairBench" at the Hanken Quantum x Finance Hackathon (8–10 Oct 2026)
 | AI mandate layer `mandate.py` + rule compiler `rules.py` (M) | Built, tested offline; **no live API call yet** |
 | Demos `scripts/demo_attribution.py`, `scripts/demo_mandate.py` | Done (`results/attribution_demo.*`, `attribution_samplers.csv`, `mandate_attribution.png`, `mandate_demo.json`) |
 | Pitch deck | First draft: https://claude.ai/artifact/Do4km8NeU9qw4oZvxEniJK (private until shared; team names are placeholders) |
-| **Real fund data** | **Not started: every attribution result so far is synthetic** |
+| **Real fund data** | Pipeline built and tested offline (RD wave); **no real filing downloaded yet, every result is still synthetic** |
 | Optimizer pivot `apps/optimizer.py` | Not started (2-line stub) |
 | Hardware runs (`ibm` / `vtt` backends) | Stubs that raise `NotImplementedError` |
 
-Test suite: **680 tests, all green** (~45 s), all offline.
+Test suite: **1,153 tests, all green** (about a minute), all offline (680 before the RD wave).
 
 ### Key findings (use this wording in the pitch)
 
@@ -155,6 +174,13 @@ fairbench/
     demo_bridge.py  attribute_qae: exact vs classical vs simulated quantum side by side
   apps/
     attribution.py  attribute() -> AttributionResult, rejection_sampler, dicke_sampler, plot_attribution
+    real_fund.py    build_period_case / run_period / run_history: a real fund vs its feasible portfolios
+  ingest/           http.py (SecClient), archive.py, edgar.py, nport.py, nport_synth.py (synthetic documents),
+                    identifiers.py, documents.py, prices.py (return sources), pipeline.py
+  store/            schema.sql, db.py (provenance on every fact row)
+  mandates/         dsl.py (Constraint), modality.py (hard/soft), extract.py (evidence checks), compile.py
+  portfolio/        weights.py (grid), reference.py (D1/D2/D3), exact.py (validator), milp.py, changes.py
+  quantum/encoding.py  Stage 2 QUBO, simulated annealing, amplitude-amplification sampler
     optimizer.py    P2 — EMPTY STUB (pivot)
 examples/           mandate_example.txt (fictional fund) + mandate_example.rules.json (reference spec)
 scripts/

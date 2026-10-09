@@ -16,5 +16,8 @@ ai = ["anthropic>=1.0"]
 [tool.setuptools.packages.find]
 include = ["fairbench*"]
 
+[tool.setuptools.package-data]
+fairbench = ["store/*.sql"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
