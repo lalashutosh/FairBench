@@ -31,6 +31,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--parent-dir", required=True), ap.add_argument("--data", default="data")
     ap.add_argument("--max-rps", type=float, default=5.0)
+    ap.add_argument("--output-stem", default="", help="optional suffix, e.g. iwb -> *_iwb.csv")
     args = ap.parse_args()
     root = Path(args.data)
     frames = []
@@ -51,13 +52,16 @@ def main() -> None:
     sic = fetch_sic(client, list(matches["cik"].dropna()) + amb)
     matches = resolve_ambiguous(matches, dict(zip(sic["cik"], sic["sic"])))
     table = sic_exclusions(hold, matches, sic).merge(hold[["security_key", "weight", "last_date"]], on="security_key")
-    table.to_csv(root / "sic_classification.csv", index=False)
+    suffix = f"_{args.output_stem}" if args.output_stem else ""
+    classification_path = root / f"sic_classification{suffix}.csv"
+    exclusions_path = root / f"exclusions_sic{suffix}.csv"
+    table.to_csv(classification_path, index=False)
     excl = table[table["excluded"]]
-    excl.to_csv(root / "exclusions_sic.csv", index=False)
+    excl.to_csv(exclusions_path, index=False)
     print(f"{len(table)} securities ever in the universe; name link: " + table["match"].value_counts().to_dict().__str__())
     print(f"SIC code found for {table['sic'].notna().sum()}; excluded {len(excl)}; requests made {client.requests_made}")
     print(excl.groupby("reason").size().to_string())
-    print("wrote", root / "sic_classification.csv", "and", root / "exclusions_sic.csv")
+    print("wrote", classification_path, "and", exclusions_path)
 
 
 if __name__ == "__main__":

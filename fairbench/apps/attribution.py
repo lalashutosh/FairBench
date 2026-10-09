@@ -30,12 +30,10 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from ..backends import sample
 from ..baselines import SampleResult, _k, random_k_subsets
 from ..constraints import ConstraintSet
 from ..data import Universe
 from ..postprocess import assign_weights, filter_feasible
-from ..quantum.ansatz import build_ansatz
 
 Sampler = Callable[[Universe, ConstraintSet, int, "int | None"], SampleResult]
 
@@ -103,6 +101,11 @@ def dicke_sampler(backend: str = "aer_statevector", circuit=None, params=None,
     keep feasible shots. Same distribution as ``rejection_sampler``.
     Pass ``circuit``/``params`` (acting on all n assets) to use another ansatz; a trained
     ansatz is NOT uniform on the feasible set and biases the null. cost = shots."""
+    # Qiskit is an optional runtime. Keep classical attribution and analytic quantum
+    # estimators importable on machines that do not install the circuit backend.
+    from ..backends import sample
+    from ..quantum.ansatz import build_ansatz
+
     def sampler(u: Universe, cs: ConstraintSet, n_samples: int, seed: int | None = None) -> SampleResult:
         k = _k(cs)
         if circuit is None:

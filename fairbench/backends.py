@@ -9,7 +9,10 @@ Credentials for hardware backends come from environment variables only
 from __future__ import annotations
 
 import numpy as np
-from qiskit import QuantumCircuit, transpile
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # optional quantum runtime; imported only when a Qiskit sampler is used
+    from qiskit import QuantumCircuit
 
 
 def bitstrings_to_array(bitstrings: list[str], n: int) -> np.ndarray:
@@ -69,6 +72,7 @@ def sample(circuit: QuantumCircuit, params, shots: int, backend: str = "aer_stat
     if backend not in ("aer_statevector", "aer_mps"):
         raise ValueError(f"unknown backend {backend!r}")
 
+    from qiskit import transpile
     from qiskit_aer import AerSimulator
 
     n = circuit.num_qubits

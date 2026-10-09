@@ -1,0 +1,22 @@
+# FairBench result directories
+
+`real_data/` is the canonical model-input directory. It is generated from the
+SEC N-PORT archive in `data/fairbench.sqlite` and contains only disclosed or
+explicitly derived real-data panels.
+
+The other files directly under `results/` include historical synthetic demos,
+regression fixtures, and individual experiment outputs. They are retained for
+tests and reproducibility, but must not be presented as scraped market data.
+
+Use `real_data/real_data_validation.json` before running a model. The validator
+checks provenance, duplicates, positive derived prices, reproducible returns,
+and zero/synthetic-value contamination. External Yahoo close prices are a
+review-only cross-check and never overwrite the SEC-derived panel.
+
+Real-data quantum runs currently in this directory:
+
+- `real_fund_parnassus_core_equity_real_systempy_quantum.json/.csv`: Parnassus vs the S&P 500 proxy, 27 intervals, ±2 percentage-point target.
+- `real_fund_calvert_equity_real_systempy_quantum.json/.csv`: Calvert vs the Russell 1000 proxy, 27 intervals, ±5 percentage-point target; no mandate-specific exclusion proxy was applied.
+
+These are noiseless analytical simulations, not claims about a present-day
+quantum-hardware speedup.

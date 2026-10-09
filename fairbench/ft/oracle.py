@@ -59,9 +59,12 @@ from __future__ import annotations
 import itertools
 import math
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
-from qiskit import QuantumCircuit
+
+if TYPE_CHECKING:  # Qiskit is needed only when emitting a circuit, not for quantisation.
+    from qiskit import QuantumCircuit
 
 from ..constraints import (AvgBound, CarbonCap, Cardinality, ConstraintSet, CountBound, Exclusion,
                            LinearThreshold, MinESG, SectorCap)
@@ -567,6 +570,7 @@ def feasibility_oracle(u: Universe, cs: ConstraintSet, bits: int | str | None = 
     for nm, qs, _ in reversed(B.gates[:n_compute]):
         B.g(nm, qs, "uncompute")
 
+    from qiskit import QuantumCircuit
     qc = QuantumCircuit(B.nq, name=f"feas_oracle_{mode}")
     qc.global_phase = global_phase
     for nm, qs, _ in B.gates:

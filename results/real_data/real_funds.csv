@@ -1,0 +1,12 @@
+fund_id,name,registrant_cik,registrant_name,adviser,asset_class,currency,fiscal_year_end,inception_date,end_date,benchmark_id,benchmark_proxy
+S000000856,Parnassus Core Equity Fund,0000866256,Parnassus Funds II,,equity,USD,1231,,,,0
+S000004310,iShares Core S&P 500 ETF,0001100663,iShares Trust,,equity,USD,0331,,,,1
+S000004347,iShares Russell 1000 ETF,0001100663,iShares Trust,,equity,USD,0331,,,,1
+S000005371,Nuveen Large Cap Responsible Equity Fund,0001084380,TIAA-CREF Funds,,equity,USD,1031,,,,0
+S000006203,Large Cap Equity Fund,0000100334,"American Century Mutual Funds, Inc.",,equity,USD,1031,,,,0
+S000008719,Calvert Equity Fund,0000356682,Calvert Social Investment Fund,,equity,USD,0930,,,,0
+S000028709,iShares MSCI USA Equal Weighted ETF,0000930667,"iShares, Inc.",,equity,USD,0831,,,,1
+S000055381,iShares ESG Aware MSCI USA ETF,0001100663,iShares Trust,,equity,USD,0831,,,,0
+S000065220,Xtrackers S&P 500 Scored & Screened ETF,0001503123,DBX ETF Trust,,equity,USD,0831,,,,0
+S000069051,State Street(R) SPDR(R) S&P 500(R) ESG ETF,0001064642,SPDR SERIES TRUST,,equity,USD,0630,,,,0
+S000074757,iShares Paris-Aligned Climate Optimized MSCI USA ETF,0001100663,iShares Trust,,equity,USD,0831,,,,0

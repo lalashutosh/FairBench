@@ -1,0 +1,85 @@
+{
+  "status": "PASS",
+  "canonical_input": "results/real_data",
+  "generated_at_utc": "2026-10-09T15:56:28.477188+00:00",
+  "counts": {
+    "funds": 11,
+    "holdings": 105646,
+    "derived_prices": 104899,
+    "snp500_proxy_price_rows": 14110,
+    "snp500_proxy_return_rows": 13446,
+    "observed_change_rows": 104456,
+    "historical_security_keys": 661,
+    "ticker_symbols": 531,
+    "external_crosscheck_rows": 12623,
+    "external_crosscheck_outliers_gt_10pct": 844
+  },
+  "checks": [
+    {
+      "name": "sec_source_provenance",
+      "passed": true,
+      "severity": "error",
+      "detail": "460,459 SEC source references checked; 0 invalid"
+    },
+    {
+      "name": "no_synthetic_rows_in_export",
+      "passed": true,
+      "severity": "error",
+      "detail": "synthetic markers found: none"
+    },
+    {
+      "name": "derived_prices_positive",
+      "passed": true,
+      "severity": "error",
+      "detail": "104,899/104,899 positive derived prices"
+    },
+    {
+      "name": "no_duplicate_price_keys",
+      "passed": true,
+      "severity": "error",
+      "detail": "0 duplicate (fund, report date, security) rows"
+    },
+    {
+      "name": "returns_reproduce_from_prices",
+      "passed": true,
+      "severity": "error",
+      "detail": "13,446/13,446 returns reproduce from start/end prices"
+    },
+    {
+      "name": "returns_have_both_filing_sources",
+      "passed": true,
+      "severity": "error",
+      "detail": "13,446/13,446 returns have both filing URLs"
+    },
+    {
+      "name": "no_zero_price_fill",
+      "passed": true,
+      "severity": "error",
+      "detail": "zero prices are not used as missing-value placeholders"
+    },
+    {
+      "name": "valid_report_dates",
+      "passed": true,
+      "severity": "error",
+      "detail": "14,110/14,110 report dates parse"
+    },
+    {
+      "name": "parent_panel_has_index_scale",
+      "passed": true,
+      "severity": "error",
+      "detail": "28 snapshots; 503-505 securities per snapshot; 661 historical security keys / 531 ticker symbols"
+    },
+    {
+      "name": "external_crosscheck_is_advisory",
+      "passed": true,
+      "severity": "warning",
+      "detail": "11,781 external matches; 10,782 within 1%; 844 >10% flagged for review"
+    }
+  ],
+  "interpretation": [
+    "SEC holdings, market values, shares, filings, returns, and flows are disclosed observations.",
+    "Quarter prices and returns are derived from SEC market_value_usd / shares and exclude dividends.",
+    "Snapshot changes are observed differences, not direct manager decisions or trade intent.",
+    "External close-price mismatches are retained and flagged; they are never used to overwrite SEC rows."
+  ]
+}
