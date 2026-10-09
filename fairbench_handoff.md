@@ -4,17 +4,18 @@ _Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 
 ## Start here
 
-**State.** Everything is on `main`. 1,162 tests, all green, all offline: `OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q` (about a minute; run it in the background, a foreground call can time out).
+**State.** Everything is on `main`. 1178 tests, all green, all offline: `OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q` (about a minute; run it in the background, a foreground call can time out).
 
 **What exists.**
 - **Core** (synthetic data): sampling engine, selection rules, attribution app, AI mandate layer, five quantum studies. Setup, usage and layout are in `README.md`.
 - **Real-fund layer** (2026-10-09): SEC download, holdings database with provenance, universe and prices from filings, three reference distributions, evidence-checked constraint format, weight-grid QUBO. How to run: `README.md` → "Real funds from public filings".
+- **Merged architecture** (2026-10-09): documents ─▶ rules ─▶ regional check ─▶ formula sheet ─▶ data ─▶ classical and quantum estimators on the same inputs ─▶ report. Diagram, what each estimator can take, and the plan: top of `BUILD_PLAN.md`. New code: `mandates/regions.py`, `mandates/formulas.py`, `apps/real_fund_quantum.py`, `scripts/mandate_formula_sheet.py`, `scripts/real_fund_quantum.py`.
 - **One real result:** Parnassus Core Equity against S&P 500 portfolios, 2019-09 to 2026-06, 27 quarters, from SEC filings only. Plain-language write-up, quarter table and checks: `REAL_FUND_RESULTS.md`. Slide figure: `results/real_fund_parnassus_core_equity.png`.
 
 **The real result.** Price growth: fund +135%, S&P 500 index fund +149%, typical 36-stock portfolio under the same rules +105%. Average quarterly rank among rule-abiding portfolios: 54 of 100 (luck alone: 50 give or take 6). The exclusions cost about 2 points. It must always carry: *proxy rules (holdings count plus 27 companies excluded by SEC industry code), price returns without dividends, one fund, not a measure of skill.*
 
 **Do next.**
-1. **Deck:** a slide for the real result (the figure plus the caveat line above), a slide for the AI layer, the quantum slides as in `PITCH_PLAN.md`, team names and contact, cut to the time limit.
+1. **The plan table at the top of `BUILD_PLAN.md`**, in order: one-command demo, a real prospectus through the reader, the hardware run, then the deck, script and Q&A sheet that `PITCH_PLAN.md` asks for (one pptx, 3 minutes, due Saturday 2026-10-10 09:30).
 2. **Run the AI layer against the live API** (never done): the user sets `ANTHROPIC_API_KEY`, then `.venv/bin/python scripts/demo_mandate.py --live`.
 3. **Optional:** a second fund (series ids in the memo §3; it needs an index fund that reports on the same months); a real prospectus through `fairbench/mandates/extract.py`; a hardware feasibility run.
 
@@ -24,8 +25,9 @@ _Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 |---|---|
 | `README.md` | setting up, running demos, using the API, finding a module |
 | `REAL_FUND_RESULTS.md` | you need the real-fund numbers, their checks, or what is disclosed / derived / assumed |
-| `PITCH_PLAN.md` | working on the pitch: schedule, judge questions, and the exact review-safe wording for every finding |
-| `BUILD_PLAN.md` | you need the detail or the "must not say" list behind a quantum number |
+| `BUILD_PLAN.md` | you need the architecture and the plan (top section), or the detail and the "must not say" list behind a quantum number ("QA results") |
+| `QUANTUM_CORE.md` | anything about the quantum estimator: how it works, what it can encode, where it does not help |
+| `PITCH_PLAN.md` | working on the pitch: the deliverable (one pptx, 3 minutes), the jury's criteria, the task list, Saturday 09:30 deadline |
 | `FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md` | adding a fund or a data source: SEC sources, fund identifiers, data gaps, licensing |
 | `FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md` | questions about the market, competitors, GIPS / SFDR / SEC rules |
 
@@ -39,9 +41,11 @@ _Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 - Quantum: simulator only. The oracle encodes linear rules; minimum-groups and the two risk caps are not encodable; the penalty Hamiltonian covers the original five rules. Amplitude-estimation numbers are noiseless query counts on synthetic data, never a speedup.
 - Deck numbers (slides 4, 5, 9) must be updated by hand if a demo is re-run with other settings.
 
-**Working agreements.** Work directly on `main`. Push only when asked. Create a branch only when asked. Sonnet subagents may be used for well-specified work. Keep every pitch claim to the review-safe wording in `PITCH_PLAN.md`. Update this file at the end of each session and keep it short: detail belongs in the files above.
+**Working agreements.** Work directly on `main`. Push only when asked. Create a branch only when asked. Sonnet subagents may be used for well-specified work. Keep every pitch claim inside `QUANTUM_CORE.md` §5 and the "must not say" list in `BUILD_PLAN.md` → "QA results". Update this file at the end of each session and keep it short: detail belongs in the files above.
 
 ## Findings, one line each
+
+_Exact wording for the quantum findings: `QUANTUM_CORE.md`. The longer reviewed wording that used to be in this file is in git history (`git show 68d220a:PITCH_PLAN.md`)._
 
 1. Dicke state + filter draws the same distribution as classical rejection sampling: a correctness baseline, not an advantage.
 2. Trained layers raise acceptance slightly but leave the uniform distribution; training cost is not paid back.
@@ -51,7 +55,7 @@ _Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 6. Attribution on synthetic data recovers a planted rank (69.3 ± 0.7 against 70).
 7. AI mandate layer on one fictional mandate: 14 of 18 rules enforced, 3 reported as not expressible; never run live.
 8. Amplitude estimation of the percentile: quadratically fewer queries in noiseless simulation, robust on fragmented tight mandates; no advantage on today's hardware and none in wall-clock time.
-9. Real fund (above): rank 54 of 100, rules cost about 2 points; under those rules every random draw is valid, so there is nothing for a quantum sampler to speed up.
+9. Real fund (above): rank 54 of 100, rules cost about 2 points. The quantum estimator, simulated on the same quarters, gives the same rank and needs a median of 1,900 queries against 5,366 classical samples for ±1 point; every random draw is valid under these rules, so the gain is in precision only, and the circuit (about 949 error-corrected qubits) is beyond any current machine.
 
 ## Core conventions (don't break these)
 - A portfolio *selection* is a uint8 vector `x` of length n (`x[i] = 1` = asset i held). Every sampler returns an `(shots, n)` uint8 array, so all metrics work on any sampler. Weights come later via `postprocess.assign_weights`.

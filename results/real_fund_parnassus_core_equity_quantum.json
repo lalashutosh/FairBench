@@ -1,0 +1,520 @@
+{
+ "synthetic": false,
+ "weights": "equal",
+ "eps_points": 1.0,
+ "n_periods": 27,
+ "mean_percentile": 56.14959259259258,
+ "median_quantum_queries": 1900.0,
+ "median_classical_samples": 5365.865708167774,
+ "median_query_ratio": 2.4094612711176486,
+ "largest_quantum_error_points": 2.8151118628926275,
+ "scaling_last_period": [
+  {
+   "eps_points": 2.0,
+   "quantum_queries": 1400.0,
+   "classical_samples": 2003.5939027141374,
+   "ratio": 1.4311385019386695
+  },
+  {
+   "eps_points": 1.0,
+   "quantum_queries": 2800.0,
+   "classical_samples": 8014.375610856549,
+   "ratio": 2.862277003877339
+  },
+  {
+   "eps_points": 0.5,
+   "quantum_queries": 3100.0,
+   "classical_samples": 32057.502443426198,
+   "ratio": 10.341129820460063
+  },
+  {
+   "eps_points": 0.2,
+   "quantum_queries": 10200.0,
+   "classical_samples": 200359.39027141375,
+   "ratio": 19.643077477589582
+  },
+  {
+   "eps_points": 0.1,
+   "quantum_queries": 40300.0,
+   "classical_samples": 801437.561085655,
+   "ratio": 19.886788116269354
+  }
+ ],
+ "resources_last_period": {
+  "n": 476,
+  "k": 34,
+  "logical_qubits": 949,
+  "toffoli_per_step": 91803.0,
+  "t_gates_per_step": 5024087.4779612655,
+  "rotations_per_step": 62356,
+  "note": "logical counts for one Grover step on an error-corrected machine; excludes magic-state factories and routing"
+ },
+ "sleeve": {
+  "n_periods": 27,
+  "mean_abs_error_quantum": 0.5455066525487877,
+  "mean_abs_error_classical_same_queries": 0.7917554404219618,
+  "share_exact_inside_quantum_ci": 0.9259259259259259,
+  "rows": [
+   {
+    "period_end": "2019-12-31",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": 0.15076440149125458,
+    "exact": 93.81868131868131,
+    "quantum": 93.11487423238249,
+    "quantum_ci": [
+     92.16245332318547,
+     94.0672951415795
+    ],
+    "quantum_queries": 900,
+    "classical_same_queries": 93.77777777777779,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2020-03-31",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": -0.16232709012082547,
+    "exact": 65.37212787212788,
+    "quantum": 65.30643537917294,
+    "quantum_ci": [
+     65.04003426795366,
+     65.5728364903922
+    ],
+    "quantum_queries": 4100,
+    "classical_same_queries": 64.4390243902439,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2020-06-30",
+    "n": 16,
+    "k": 7,
+    "n_portfolios": 11440,
+    "fund_return": 0.2425085343770641,
+    "exact": 93.54895104895104,
+    "quantum": 93.30300889031801,
+    "quantum_ci": [
+     92.85759414718443,
+     93.74842363345161
+    ],
+    "quantum_queries": 2000,
+    "classical_same_queries": 94.15,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2020-09-30",
+    "n": 16,
+    "k": 8,
+    "n_portfolios": 12870,
+    "fund_return": 0.13428947246462197,
+    "exact": 77.44366744366744,
+    "quantum": 77.26683220998534,
+    "quantum_ci": [
+     76.9198803261606,
+     77.61378409381008
+    ],
+    "quantum_queries": 3100,
+    "classical_same_queries": 76.48387096774194,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2020-12-31",
+    "n": 16,
+    "k": 8,
+    "n_portfolios": 12870,
+    "fund_return": 0.05530670263997073,
+    "exact": 13.923853923853924,
+    "quantum": 13.771878304157706,
+    "quantum_ci": [
+     13.160690462458009,
+     14.383066145857404
+    ],
+    "quantum_queries": 2100,
+    "classical_same_queries": 14.904761904761903,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2021-03-31",
+    "n": 16,
+    "k": 7,
+    "n_portfolios": 11440,
+    "fund_return": 0.014385749914099577,
+    "exact": 12.211538461538462,
+    "quantum": 12.318203821427542,
+    "quantum_ci": [
+     11.857254996270807,
+     12.779152646584278
+    ],
+    "quantum_queries": 2300,
+    "classical_same_queries": 13.086956521739129,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2021-06-30",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": 0.1768006044448489,
+    "exact": 93.78121878121878,
+    "quantum": 93.11487423238249,
+    "quantum_ci": [
+     92.16245332318547,
+     94.0672951415795
+    ],
+    "quantum_queries": 900,
+    "classical_same_queries": 93.66666666666667,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2021-09-30",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": 0.048098520583564675,
+    "exact": 92.42216117216118,
+    "quantum": 92.297319537225,
+    "quantum_ci": [
+     91.7039920686884,
+     92.89064700576161
+    ],
+    "quantum_queries": 1700,
+    "classical_same_queries": 93.17647058823529,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2021-12-31",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": 0.22426067322551835,
+    "exact": 93.75,
+    "quantum": 93.11487423238249,
+    "quantum_ci": [
+     92.16245332318547,
+     94.0672951415795
+    ],
+    "quantum_queries": 900,
+    "classical_same_queries": 93.66666666666667,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2022-03-31",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": -0.05560789574438885,
+    "exact": 51.23626373626373,
+    "quantum": 58.873924272640274,
+    "quantum_ci": [
+     58.584923670815435,
+     59.16292487446512
+    ],
+    "quantum_queries": 3400,
+    "classical_same_queries": 50.14705882352941,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2022-06-30",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": -0.22077060688814443,
+    "exact": 22.96245421245421,
+    "quantum": 23.159270944647968,
+    "quantum_ci": [
+     22.87189882721654,
+     23.446643062079392
+    ],
+    "quantum_queries": 3300,
+    "classical_same_queries": 23.87878787878788,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2022-09-30",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": -0.105146710087477,
+    "exact": 11.744505494505495,
+    "quantum": 11.9172848606381,
+    "quantum_ci": [
+     11.34252917962215,
+     12.492040541654049
+    ],
+    "quantum_queries": 2100,
+    "classical_same_queries": 12.666666666666668,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2022-12-31",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": 0.07355494909337734,
+    "exact": 71.52847152847153,
+    "quantum": 71.39964579898235,
+    "quantum_ci": [
+     71.11228185339604,
+     71.68700974456866
+    ],
+    "quantum_queries": 3900,
+    "classical_same_queries": 70.64102564102565,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2023-03-31",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": 0.24384783243097474,
+    "exact": 85.62687312687312,
+    "quantum": 85.47207099503493,
+    "quantum_ci": [
+     84.74249728833824,
+     86.20164470173161
+    ],
+    "quantum_queries": 2000,
+    "classical_same_queries": 84.6,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2023-06-30",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": 0.18952033416007708,
+    "exact": 74.98751248751249,
+    "quantum": 74.99617899286277,
+    "quantum_ci": [
+     74.67531808806406,
+     75.31703989766149
+    ],
+    "quantum_queries": 3500,
+    "classical_same_queries": 74.08571428571429,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2023-09-30",
+    "n": 16,
+    "k": 4,
+    "n_portfolios": 1820,
+    "fund_return": -0.017151065696239143,
+    "exact": 19.28571428571429,
+    "quantum": 19.488098229661954,
+    "quantum_ci": [
+     19.05439727174819,
+     19.92179918757572
+    ],
+    "quantum_queries": 2600,
+    "classical_same_queries": 20.26923076923077,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2023-12-31",
+    "n": 16,
+    "k": 5,
+    "n_portfolios": 4368,
+    "fund_return": 0.10521385763775504,
+    "exact": 75.82417582417582,
+    "quantum": 75.629403895828,
+    "quantum_ci": [
+     75.29438921205917,
+     75.96441857959684
+    ],
+    "quantum_queries": 3100,
+    "classical_same_queries": 74.87096774193547,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2024-03-31",
+    "n": 16,
+    "k": 4,
+    "n_portfolios": 1820,
+    "fund_return": 0.22862756041135923,
+    "exact": 78.62637362637362,
+    "quantum": 78.90128122074044,
+    "quantum_ci": [
+     78.45574106656802,
+     79.34682137491288
+    ],
+    "quantum_queries": 2700,
+    "classical_same_queries": 77.5925925925926,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2024-06-30",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": 0.16535597366245258,
+    "exact": 95.45454545454545,
+    "quantum": 94.70856526493304,
+    "quantum_ci": [
+     93.82871045034449,
+     95.5884200795216
+    ],
+    "quantum_queries": 900,
+    "classical_same_queries": 95.44444444444444,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2024-09-30",
+    "n": 16,
+    "k": 6,
+    "n_portfolios": 8008,
+    "fund_return": 0.014522953672730932,
+    "exact": 16.421078921078923,
+    "quantum": 16.11280085163294,
+    "quantum_ci": [
+     15.525462780460234,
+     16.70013892280565
+    ],
+    "quantum_queries": 2100,
+    "classical_same_queries": 17.523809523809526,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2024-12-31",
+    "n": 16,
+    "k": 7,
+    "n_portfolios": 11440,
+    "fund_return": 0.1129861087230355,
+    "exact": 67.7534965034965,
+    "quantum": 67.46377206083493,
+    "quantum_ci": [
+     66.60162190358544,
+     68.32592221808441
+    ],
+    "quantum_queries": 1900,
+    "classical_same_queries": 66.36842105263158,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2025-03-31",
+    "n": 16,
+    "k": 8,
+    "n_portfolios": 12870,
+    "fund_return": -0.1122803514674493,
+    "exact": 10.124320124320125,
+    "quantum": 10.614491731989302,
+    "quantum_ci": [
+     10.157672862939785,
+     11.071310601038817
+    ],
+    "quantum_queries": 1900,
+    "classical_same_queries": 8.947368421052632,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2025-06-30",
+    "n": 16,
+    "k": 8,
+    "n_portfolios": 12870,
+    "fund_return": 0.20182199562533154,
+    "exact": 90.9013209013209,
+    "quantum": 91.05134201341816,
+    "quantum_ci": [
+     90.46605821099757,
+     91.63662581583876
+    ],
+    "quantum_queries": 1800,
+    "classical_same_queries": 91.94444444444444,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2025-09-30",
+    "n": 16,
+    "k": 8,
+    "n_portfolios": 12870,
+    "fund_return": 0.1289318897505276,
+    "exact": 63.783993783993786,
+    "quantum": 63.683189970049426,
+    "quantum_ci": [
+     63.45223904243661,
+     63.91414089766224
+    ],
+    "quantum_queries": 4700,
+    "classical_same_queries": 62.91489361702127,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2025-12-31",
+    "n": 16,
+    "k": 8,
+    "n_portfolios": 12870,
+    "fund_return": 0.10011699628872162,
+    "exact": 86.86091686091686,
+    "quantum": 86.78260031157554,
+    "quantum_ci": [
+     86.3892089512612,
+     87.17599167188986
+    ],
+    "quantum_queries": 2500,
+    "classical_same_queries": 85.96000000000001,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2026-03-31",
+    "n": 16,
+    "k": 7,
+    "n_portfolios": 11440,
+    "fund_return": -0.11353880702692998,
+    "exact": 7.036713286713287,
+    "quantum": 7.325038064986845,
+    "quantum_ci": [
+     6.850854654338574,
+     7.799221475635116
+    ],
+    "quantum_queries": 1800,
+    "classical_same_queries": 6.333333333333334,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   },
+   {
+    "period_end": "2026-06-30",
+    "n": 16,
+    "k": 7,
+    "n_portfolios": 11440,
+    "fund_return": 0.1724054113500213,
+    "exact": 97.92832167832168,
+    "quantum": 97.50010699313711,
+    "quantum_ci": [
+     96.97323950292406,
+     98.02697448335017
+    ],
+    "quantum_queries": 1000,
+    "classical_same_queries": 97.8,
+    "eps": 0.02,
+    "device": "exact state-vector Grover simulation in the weight-k subspace (noiseless)"
+   }
+  ]
+ },
+ "reading": "Noiseless simulation; one query = one oracle call = one classical sample checked. Query counts, not time: each query on a fault-tolerant machine is far slower than a classical check. No advantage on current hardware."
+}
