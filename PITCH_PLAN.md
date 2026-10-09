@@ -19,7 +19,7 @@ Built and tested (680 offline tests): the sampling engine, ten constraint types,
 
 What is still missing, in order of how much a judge would care:
 
-1. **No real fund or real data.** Every number is synthetic with a planted answer.
+1. ✅ **One real fund run** (2026-10-09): Parnassus Core Equity against S&P 500 portfolios, from SEC filings, under a proxy mandate. Numbers, the figure and the sentences that must go with it: `REAL_FUND_RESULTS.md`. Every other attribution number is still synthetic.
 2. **The AI layer has never made a live API call.**
 3. ✅ **Quantum story upgraded.** It is no longer just "we tested it and found no advantage". It is now "quadratically fewer queries for the quantity the tool reports, robust where classical MCMC fails; a fault-tolerant-era result we can quantify today". It still has to be told precisely: query counts in simulation, not a speedup.
 4. Deck gaps: no AI-layer slide, team names and contact are placeholders, not cut to the time limit, layout never checked visually.
@@ -29,7 +29,7 @@ What is still missing, in order of how much a judge would care:
 
 > When an ESG fund underperforms, nobody can say whether it is the manager or the rules. FairBench reads the fund's policy text with an AI layer, turns it into exact constraints, samples thousands of portfolios that obey the same rules, and splits the fund's result into *what the rules cost* and *what the manager added*. The sampler is pluggable. The quantity the tool reports, the fund's percentile among rule-abiding portfolios, is exactly what quantum amplitude estimation is built for. In simulation it needs quadratically fewer queries than classical sampling, and it keeps working on tight mandates where classical MCMC gets trapped. We say plainly that this is a fault-tolerant-era result, not a speedup on today's machines, and we show where the break-even sits.
 
-Every claim stays inside the review-safe wording in `fairbench_handoff.md` ("Key findings") and `BUILD_PLAN.md` → "QA results" (which has a "must not say" list). Never say "quantum speedup".
+Every claim stays inside the review-safe wording at the end of this file ("Review-safe wording for each finding") and `BUILD_PLAN.md` → "QA results" (which has a "must not say" list). Never say "quantum speedup".
 
 ## Priorities
 
@@ -130,3 +130,22 @@ Every claim stays inside the review-safe wording in `fairbench_handoff.md` ("Key
 - Deck fits the time limit, has names and contact, and every number matches a file in `results/`.
 - Two timed rehearsals done; Q&A answers assigned.
 - A backup of the demo works on the presentation laptop.
+
+## Review-safe wording for each finding
+
+_Moved here from the handoff on 2026-10-09 so it is read when the pitch is being written, not at the start of every session._
+
+1. **Dicke + filter ≡ classical rejection sampling** in distribution. It is a correctness baseline, not an advantage (P0 toy: acceptance 0.240 vs 0.244).
+2. **Trained layers (P1):** on the P0 toy, acceptance rises 0.24 → 0.32, but the distribution moves away from uniform (TV above sampling floor 0.05 vs 0.00). On the island instance the gain is negligible (0.0123 → 0.0138). Training costs ≥ ~400k shot-equivalents, so it needs ~400k feasible samples to pay back. Swap-MCMC is trapped on islands (coverage 0.31 vs 0.85 for rejection).
+3. **MPS simulability (P1):** bond dimension needed grows fast with depth (n=20, p=2: max bond 232, 44 s), so the circuit is not trivially classically simulable at depth, but this is not an advantage claim.
+4. **Quantum-enhanced MCMC (Q):** exact spectral gaps, n ≤ 16, parameters frozen on seeds 0–4 and reported on held-out seeds. QeMCMC beats penalty-blind chains 9–19× per step **only when given an exact feasibility oracle**, and a classical tilted walk given the same oracle does at least as well (ratio 0.42–0.84). Pitch line: *"We found no evidence of quantum advantage at n ≤ 16 (small instances, a trend not a proof)."*
+5. **Amplitude amplification (AA):** we built a verified reversible feasibility oracle (~120–130·n Toffoli) and a full logical cost model. Samples are exactly uniform over the feasible set. Algorithmic logical qubits ≈ 200–400 at n = 100–200 (excludes factories/routing). Quantum takes ~0.3–1 s per sample (optimistic hardware) vs ~30–120 µs classically, i.e. ~10⁴× slower. Break-even needs a feasible fraction below ~1e-9 to 1e-12, but our synthetic constraint family sits at 0.01–0.2. Full pitch-safe paragraph: `BUILD_PLAN.md` → "AA-3 results".
+
+6. **Attribution (P2), synthetic data with planted ground truth:** n = 100, k = 20, three years of Gaussian returns with a planted rally in carbon-heavy names, fund planted at rank 70 of rule-abiding portfolios. Result: fund −3.4 pts vs benchmark = constraint effect −8.7 pts [95% MC CI −9.3, −8.3] + manager effect +5.4 pts; recovered percentile 69.3 ± 0.7. At n = 16 the Dicke circuit (`aer_statevector`, 14 qubits after exclusions), classical rejection and exact enumeration agree (percentile 67.5 / 68.5 / 68.3; KS p = 0.24). **No real fund has been analysed.**
+7. **AI mandate layer (M), one fictional mandate:** 18 rules = 14 enforced, 1 trivially satisfied, 3 reported as not expressible (yearly decarbonisation target, EU Taxonomy share, stewardship). The compiled rules exclude 58 of 150 assets and leave 0.54% of 20-name portfolios feasible. Attribution with them: −1.5 pts = constraint −6.3 + manager +4.8, percentile 70.4 ± 0.6 (planted 70). Pitch line: *"An AI layer reads the policy text; deterministic code turns it into constraints and shows what was enforced and what could not be. Tested on one fictional mandate, not on real fund documents, and not yet against the live API."*
+
+8. **Quantum amplitude estimation of the attribution (QA):** in noiseless simulation, amplitude estimation needs quadratically fewer queries for the attribution percentile (error ∝ queries^−1 vs ^−½). It does not depend on the feasible set being connected, which matters on fragmented tight mandates where swap-MCMC gets trapped. Percentile only: on the example mandate ~7–20× fewer queries than rejection at ±1 pp, assuming an oracle for all rules (two of them cannot be encoded). Whole attribution (percentile + both medians, classical warm start for the medians): ~2× fewer queries than rejection at P_F 3%, 4–16× on tighter rules, parity or a small loss on loose rules; 2–9× fewer than swap-MCMC. Noisy hardware: ~17k two-qubit gates per step at 16 assets, advantage needs error rates of order 1e-6. Fault-tolerant wall-clock: ≥ 8e3× slower at ±1 pp. Exact-counting DP is intractable with ≥ 3 weighted rules or overlapping group caps. Full numbers and the reviewed pitch paragraph: `BUILD_PLAN.md` → "QA results"; figure `results/qae_pitch_figure.png`; demo `scripts/demo_qae.py`. Pitch line: *"A fault-tolerant-era result we can quantify today, not a speedup on current or near-term hardware."*
+
+9. **Real fund (RD), Parnassus Core Equity, 2019-09 to 2026-06, SEC filings, proxy mandate:** its disclosed portfolios, held a quarter at a time, grew +135% in price terms against +149% for the S&P 500 index fund and +105% for the typical 36-stock portfolio allowed by the same rules. Average quarterly percentile among rule-abiding portfolios 54 (random picks: 50 give or take 6). Excluding 27 companies by SEC industry code moved the typical portfolio by about −2 points. Pitch line: *"On one real fund, from public filings only: the rules we could reproduce cost about two points in seven years, and the manager's picks ranked 54 out of 100 among portfolios the same rules allowed, which is not distinguishable from 50. Proxy rules, price returns without dividends, one fund, not a measure of skill."* Under these rules every random draw is valid, so this run is NOT a case where a quantum sampler could help.
+
+**Honest story for the pitch:** a constraint-preserving quantum sampler plus a careful benchmarking harness. Every speedup route was tested against fair classical baselines, and we report where the break-even would be. The practical tool (attribution) runs on classical rejection sampling today, with the quantum sampler as a drop-in backend.

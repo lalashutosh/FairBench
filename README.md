@@ -47,8 +47,8 @@ fund - benchmark = (same-rules median - benchmark)   constraint effect: what the
 - The quantum penalty and oracle encodings cover the original five constraint types; the five
   newer ones are enforced by the samplers and the attribution only.
 
-Numbers, protocols and review-safe wording are in [`fairbench_handoff.md`](fairbench_handoff.md)
-and [`BUILD_PLAN.md`](BUILD_PLAN.md).
+Numbers and protocols are in [`BUILD_PLAN.md`](BUILD_PLAN.md); the review-safe wording for each finding is in
+[`PITCH_PLAN.md`](PITCH_PLAN.md); [`fairbench_handoff.md`](fairbench_handoff.md) is the short entry point.
 
 ## Quick start
 
@@ -240,8 +240,9 @@ What the output means:
 - Rules that need data the public does not have (vendor ESG ratings, provider emissions data)
   are recorded with their evidence, marked `unobservable`, and never enforced.
 
-[`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) has the worked example, the samplers scored against
-exact distributions, and the list of what is disclosed, derived, assumed and missing.
+[`REAL_FUND_RESULTS.md`](REAL_FUND_RESULTS.md) has the result in plain words, the quarter-by-quarter table, the checks
+(a made-up example with planted answers; every sampler scored against exact answers) and the list of what is
+disclosed, derived, assumed and missing.
 
 ## Using it on your own data
 
