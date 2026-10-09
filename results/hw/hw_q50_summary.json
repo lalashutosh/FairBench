@@ -1,14 +1,15 @@
 {
- "aer": {
-  "file": "/home/ashutosh/projects/qfhack/fairbench/results/hw/hw_q50_aer_20261009T131255Z.json",
+ "q50@20261009T141216Z": {
+  "file": "results/hw/hw_q50_q50_20261009T141216Z.json",
   "meta": {
-   "backend": "aer",
-   "backend_name": "aer_simulator",
+   "backend": "q50",
+   "backend_name": "IQMBackend",
    "shots": 2000,
    "ems": null,
+   "layout": "0,1,2,3,4,5,6,7",
    "p2_sim": null,
-   "utc": "20261009T131255Z",
-   "qiskit": "2.5.2",
+   "utc": "20261009T141216Z",
+   "qiskit": "2.1.2",
    "assets": [
     "A",
     "B",
@@ -26,62 +27,96 @@
     "D"
    ],
    "note": "Toy instance for hardware characterisation; not an advantage claim.",
-   "job_id": "85379a93-b794-4f9d-a92a-1c4f52e34b29"
+   "job_id": "5365cb3b-2392-413d-8a82-53c103d7d3b0"
   },
   "dicke": [
    {
     "id": "dicke_n4_k2",
     "n": 4,
     "k": 2,
-    "valid": 1.0,
+    "valid": 0.5435,
     "chance": 0.375,
-    "tv_uniform": 0.03499999999999999,
-    "two_qubit": 24,
+    "tv_uniform": 0.07865685372585098,
+    "two_qubit": 46,
     "shots": 2000
    },
    {
     "id": "dicke_n6_k2",
     "n": 6,
     "k": 2,
-    "valid": 1.0,
+    "valid": 0.3425,
     "chance": 0.234375,
-    "tv_uniform": 0.035666666666666666,
-    "two_qubit": 46,
+    "tv_uniform": 0.1124087591240876,
+    "two_qubit": 92,
     "shots": 2000
    },
    {
     "id": "dicke_n6_k3",
     "n": 6,
     "k": 3,
-    "valid": 1.0,
+    "valid": 0.318,
     "chance": 0.3125,
-    "tv_uniform": 0.02799999999999999,
-    "two_qubit": 73,
+    "tv_uniform": 0.15188679245283015,
+    "two_qubit": 144,
     "shots": 2000
    },
    {
     "id": "dicke_n8_k3",
     "n": 8,
     "k": 3,
-    "valid": 1.0,
+    "valid": 0.2855,
     "chance": 0.21875,
-    "tv_uniform": 0.06128571428571425,
-    "two_qubit": 113,
+    "tv_uniform": 0.24671628721541153,
+    "two_qubit": 239,
     "shots": 2000
    }
   ],
+  "qae": {}
+ },
+ "q50@20261009T135154Z": {
+  "file": "results/hw/hw_q50_q50_20261009T135154Z.json",
+  "meta": {
+   "backend": "q50",
+   "backend_name": "IQMBackend",
+   "shots": 2000,
+   "ems": null,
+   "layout": "0,1,2,3",
+   "p2_sim": null,
+   "utc": "20261009T135154Z",
+   "qiskit": "2.1.2",
+   "assets": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ],
+   "growth": [
+    1.12,
+    0.95,
+    1.3,
+    1.05
+   ],
+   "fund": [
+    "A",
+    "D"
+   ],
+   "note": "Toy instance for hardware characterisation; not an advantage claim.",
+   "job_id": "619c40b9-fbdc-4c31-b97d-e43fba195019"
+  },
+  "dicke": [],
   "qae": {
    "rank": {
     "variant": "rank",
     "a_exact": 0.3333333333333333,
-    "a_hat": 0.33501863199090853,
+    "a_hat": 0.2678663331844941,
     "ci95": [
-     0.3325506204760408,
-     0.3387291013517646
+     0.2255684256156247,
+     0.31540673623448506
     ],
-    "fidelity_per_step": 1.0,
-    "naive_m0": 0.335,
-    "naive_m0_postselected": 0.335,
+    "fidelity_per_step": 0.4214285714285714,
+    "survival_per_grover_step": 0.1776020408163265,
+    "naive_m0": 0.1855,
+    "naive_m0_postselected": 0.31900257953568356,
     "ms": [
      0,
      1,
@@ -89,10 +124,10 @@
      3
     ],
     "p_good": [
-     0.335,
-     0.935,
-     0.002,
-     0.8515
+     0.1855,
+     0.1905,
+     0.126,
+     0.126
     ],
     "p_ideal": [
      0.3333333333333333,
@@ -101,25 +136,26 @@
      0.8454503886602649
     ],
     "two_qubit": [
-     24,
-     88,
-     152,
-     216
+     46,
+     154,
+     273,
+     386
     ],
-    "theta": 0.6172661133614649,
+    "theta": 0.5439945584819701,
     "pmix": 0.125
    },
    "single": {
     "variant": "single",
     "a_exact": 0.16666666666666666,
-    "a_hat": 0.16701614997171224,
+    "a_hat": 0.13074860474610225,
     "ci95": [
-     0.16506860658094172,
-     0.16897281424628846
+     0.09988752704886458,
+     0.159784586861339
     ],
-    "fidelity_per_step": 1.0,
-    "naive_m0": 0.176,
-    "naive_m0_postselected": 0.176,
+    "fidelity_per_step": 0.43571428571428567,
+    "survival_per_grover_step": 0.18984693877551015,
+    "naive_m0": 0.1,
+    "naive_m0_postselected": 0.1733102253032929,
     "ms": [
      0,
      1,
@@ -127,160 +163,10 @@
      3
     ],
     "p_good": [
-     0.176,
-     0.911,
-     0.7385,
-     0.04
-    ],
-    "p_ideal": [
-     0.16666666666666666,
-     0.9074074074074074,
-     0.7427983539094652,
-     0.0386374028349337
-    ],
-    "two_qubit": [
-     24,
-     83,
-     142,
-     201
-    ],
-    "theta": 0.42100301993424677,
-    "pmix": 0.0625
-   }
-  }
- },
- "noisy_p2=0.01": {
-  "file": "/home/ashutosh/projects/qfhack/fairbench/results/hw/hw_q50_noisy_20261009T131301Z.json",
-  "meta": {
-   "backend": "noisy",
-   "backend_name": "aer_simulator",
-   "shots": 2000,
-   "ems": null,
-   "p2_sim": 0.01,
-   "utc": "20261009T131301Z",
-   "qiskit": "2.5.2",
-   "assets": [
-    "A",
-    "B",
-    "C",
-    "D"
-   ],
-   "growth": [
-    1.12,
-    0.95,
-    1.3,
-    1.05
-   ],
-   "fund": [
-    "A",
-    "D"
-   ],
-   "note": "Toy instance for hardware characterisation; not an advantage claim.",
-   "job_id": "23580c87-e810-4b80-abd4-2c82bb6f07f1"
-  },
-  "dicke": [
-   {
-    "id": "dicke_n4_k2",
-    "n": 4,
-    "k": 2,
-    "valid": 0.797,
-    "chance": 0.375,
-    "tv_uniform": 0.018402342116269343,
-    "two_qubit": 24,
-    "shots": 2000
-   },
-   {
-    "id": "dicke_n6_k2",
-    "n": 6,
-    "k": 2,
-    "valid": 0.6575,
-    "chance": 0.234375,
-    "tv_uniform": 0.05196451204055767,
-    "two_qubit": 46,
-    "shots": 2000
-   },
-   {
-    "id": "dicke_n6_k3",
-    "n": 6,
-    "k": 3,
-    "valid": 0.571,
-    "chance": 0.3125,
-    "tv_uniform": 0.04553415061295972,
-    "two_qubit": 73,
-    "shots": 2000
-   },
-   {
-    "id": "dicke_n8_k3",
-    "n": 8,
-    "k": 3,
-    "valid": 0.4695,
-    "chance": 0.21875,
-    "tv_uniform": 0.09687357371063444,
-    "two_qubit": 113,
-    "shots": 2000
-   }
-  ],
-  "qae": {
-   "rank": {
-    "variant": "rank",
-    "a_exact": 0.3333333333333333,
-    "a_hat": 0.3166233545451292,
-    "ci95": [
-     0.2985105817044882,
-     0.33501863199090853
-    ],
-    "fidelity_per_step": 0.7,
-    "naive_m0": 0.2555,
-    "naive_m0_postselected": 0.32882882882882886,
-    "ms": [
-     0,
-     1,
-     2,
-     3
-    ],
-    "p_good": [
-     0.2555,
-     0.407,
+     0.1,
      0.1145,
-     0.184
-    ],
-    "p_ideal": [
-     0.3333333333333333,
-     0.9259259259259262,
-     0.004115226337448598,
-     0.8454503886602649
-    ],
-    "two_qubit": [
-     24,
-     88,
-     152,
-     216
-    ],
-    "theta": 0.5976398040187431,
-    "pmix": 0.125
-   },
-   "single": {
-    "variant": "single",
-    "a_exact": 0.16666666666666666,
-    "a_hat": 0.16024000143423342,
-    "ci95": [
-     0.15026715247113231,
-     0.17093854580895548
-    ],
-    "fidelity_per_step": 0.719047619047619,
-    "naive_m0": 0.1335,
-    "naive_m0_postselected": 0.17159383033419023,
-    "ms": [
-     0,
-     1,
-     2,
-     3
-    ],
-    "p_good": [
-     0.1335,
-     0.3735,
-     0.196,
-     0.0675
+     0.0895,
+     0.0685
     ],
     "p_ideal": [
      0.16666666666666666,
@@ -289,26 +175,27 @@
      0.0386374028349337
     ],
     "two_qubit": [
-     24,
-     83,
-     142,
-     201
+     46,
+     146,
+     250,
+     351
     ],
-    "theta": 0.4118440755743099,
+    "theta": 0.3699746156431701,
     "pmix": 0.0625
    }
   }
  },
- "noisy_p2=0.003": {
-  "file": "/home/ashutosh/projects/qfhack/fairbench/results/hw/hw_q50_noisy_20261009T131303Z.json",
+ "q50_ems1@20261009T135459Z": {
+  "file": "results/hw/hw_q50_q50_ems1_20261009T135459Z.json",
   "meta": {
-   "backend": "noisy",
-   "backend_name": "aer_simulator",
+   "backend": "q50",
+   "backend_name": "IQMBackend",
    "shots": 2000,
-   "ems": null,
-   "p2_sim": 0.003,
-   "utc": "20261009T131303Z",
-   "qiskit": "2.5.2",
+   "ems": 1,
+   "layout": "0,1,2,3",
+   "p2_sim": null,
+   "utc": "20261009T135459Z",
+   "qiskit": "2.1.2",
    "assets": [
     "A",
     "B",
@@ -326,62 +213,22 @@
     "D"
    ],
    "note": "Toy instance for hardware characterisation; not an advantage claim.",
-   "job_id": "6d014ef5-1bc5-4b1c-ad82-859e241fee52"
+   "job_id": "48c0b02c-daf7-4921-b2ac-c9d33908017f"
   },
-  "dicke": [
-   {
-    "id": "dicke_n4_k2",
-    "n": 4,
-    "k": 2,
-    "valid": 0.8645,
-    "chance": 0.375,
-    "tv_uniform": 0.014748409485251593,
-    "two_qubit": 24,
-    "shots": 2000
-   },
-   {
-    "id": "dicke_n6_k2",
-    "n": 6,
-    "k": 2,
-    "valid": 0.8025,
-    "chance": 0.234375,
-    "tv_uniform": 0.04735202492211837,
-    "two_qubit": 46,
-    "shots": 2000
-   },
-   {
-    "id": "dicke_n6_k3",
-    "n": 6,
-    "k": 3,
-    "valid": 0.752,
-    "chance": 0.3125,
-    "tv_uniform": 0.039228723404255296,
-    "two_qubit": 73,
-    "shots": 2000
-   },
-   {
-    "id": "dicke_n8_k3",
-    "n": 8,
-    "k": 3,
-    "valid": 0.655,
-    "chance": 0.21875,
-    "tv_uniform": 0.081979280261723,
-    "two_qubit": 113,
-    "shots": 2000
-   }
-  ],
+  "dicke": [],
   "qae": {
    "rank": {
     "variant": "rank",
     "a_exact": 0.3333333333333333,
-    "a_hat": 0.339968144491676,
+    "a_hat": 0.2338511411436949,
     "ci95": [
-     0.3319036682379969,
-     0.3511678264935135
+     0.19467073412248176,
+     0.2789756430785709
     ],
-    "fidelity_per_step": 0.8833333333333333,
-    "naive_m0": 0.2885,
-    "naive_m0_postselected": 0.335075493612079,
+    "fidelity_per_step": 0.4404761904761904,
+    "survival_per_grover_step": 0.19401927437641717,
+    "naive_m0": 0.17912694430506773,
+    "naive_m0_postselected": 0.298744769874477,
     "ms": [
      0,
      1,
@@ -389,10 +236,10 @@
      3
     ],
     "p_good": [
-     0.2885,
-     0.6625,
-     0.0545,
-     0.447
+     0.17912694430506773,
+     0.19568489713998996,
+     0.14816675037669513,
+     0.11490215755143
     ],
     "p_ideal": [
      0.3333333333333333,
@@ -401,25 +248,26 @@
      0.8454503886602649
     ],
     "two_qubit": [
-     24,
-     88,
-     152,
-     216
+     46,
+     154,
+     273,
+     386
     ],
-    "theta": 0.6224997958528573,
+    "theta": 0.5047419397965265,
     "pmix": 0.125
    },
    "single": {
     "variant": "single",
     "a_exact": 0.16666666666666666,
-    "a_hat": 0.16409827189737067,
+    "a_hat": 0.16799334534241855,
     "ci95": [
-     0.16024000143423342,
-     0.16799334534241855
+     0.14060446795353318,
+     0.1983889753396036
     ],
-    "fidelity_per_step": 0.888095238095238,
-    "naive_m0": 0.1465,
-    "naive_m0_postselected": 0.16877880184331798,
+    "fidelity_per_step": 0.44999999999999996,
+    "survival_per_grover_step": 0.20249999999999996,
+    "naive_m0": 0.10832497492477432,
+    "naive_m0_postselected": 0.17518248175182483,
     "ms": [
      0,
      1,
@@ -427,10 +275,10 @@
      3
     ],
     "p_good": [
-     0.1465,
-     0.654,
-     0.4475,
-     0.055
+     0.10832497492477432,
+     0.14264188849824208,
+     0.07074761665830406,
+     0.08186840783525866
     ],
     "p_ideal": [
      0.16666666666666666,
@@ -439,12 +287,12 @@
      0.0386374028349337
     ],
     "two_qubit": [
-     24,
-     83,
-     142,
-     201
+     46,
+     146,
+     250,
+     351
     ],
-    "theta": 0.4170777580657024,
+    "theta": 0.4223114405570949,
     "pmix": 0.0625
    }
   }

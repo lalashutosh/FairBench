@@ -162,19 +162,48 @@ def build_experiments(which: str) -> list[dict]:
                 exps.append(dict(id=f"qae_{label}_m{m}", kind="qae", variant=label, n=4, k=2, m=m,
                                  circuit=qc, marked=[bitstring(p, 4) for p in marked],
                                  a_exact=a, p_good_ideal=math.sin((2 * m + 1) * th) ** 2))
+    if which in ("diag", "all_diag"):
+        for label, ones in (("ro_0000", []), ("ro_1111", [0, 1, 2, 3]), ("ro_0011", [0, 1])):
+            qc = QuantumCircuit(4)
+            for q in ones:
+                qc.x(q)
+            qc.measure_all()
+            qc.name = label
+            exps.append(dict(id=label, kind="readout", n=4, circuit=qc,
+                             expected="".join("1" if (3 - j) in ones else "0" for j in range(4))))
+        bell = QuantumCircuit(2)
+        bell.h(0)
+        bell.cx(0, 1)
+        bell.measure_all()
+        bell.name = "bell"
+        exps.append(dict(id="bell", kind="ghz", n=2, circuit=bell))
+        ghz = QuantumCircuit(4)
+        ghz.h(0)
+        for q in range(3):
+            ghz.cx(q, q + 1)
+        ghz.measure_all()
+        ghz.name = "ghz4"
+        exps.append(dict(id="ghz4", kind="ghz", n=4, circuit=ghz))
     return exps
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--backend", choices=["aer", "noisy", "q50"], default="aer")
-    ap.add_argument("--exp", choices=["A", "B", "all"], default="all")
+    ap.add_argument("--exp", choices=["A", "B", "all", "diag"], default="all",
+                    help="diag = readout test (0000/1111/0011), Bell pair, 4-qubit GHZ")
+    ap.add_argument("--layout", default=None,
+                    help="comma-separated physical qubits to use, e.g. 10,11,15,16 (default: transpiler's choice)")
     ap.add_argument("--shots", type=int, default=2000)
     ap.add_argument("--p2", type=float, default=0.01, help="two-qubit depolarising error (noisy sim)")
     ap.add_argument("--ems", type=int, default=None, help="FiQCI-EMS mitigation level (q50 only)")
     ap.add_argument("--opt", type=int, default=3, help="transpiler optimization level")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--retrieve", default=None,
+                    help="path to a saved record without counts: fetch its job from Q50 and fill the counts in")
     a = ap.parse_args()
+    if a.retrieve:
+        return retrieve(Path(a.retrieve), a)
 
     OUT.mkdir(parents=True, exist_ok=True)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -182,11 +211,15 @@ def main():
 
     backend, basis = get_backend(a.backend, a.p2, a.ems)
     exps = build_experiments(a.exp)
+    layout = [int(x) for x in a.layout.split(",")] if a.layout else None
     tcs = [transpile(e["circuit"], backend=None if basis else backend, basis_gates=basis,
-                     optimization_level=a.opt, seed_transpiler=a.seed) for e in exps]
+                     optimization_level=a.opt, seed_transpiler=a.seed,
+                     initial_layout=layout[:e["circuit"].num_qubits] if layout else None) for e in exps]
+    for e, tc in zip(exps, tcs):
+        e["physical_qubits"] = sorted({tc.find_bit(q).index for inst in tc.data for q in inst.qubits})
     import qiskit
     meta = dict(backend=a.backend, backend_name=str(getattr(backend, "name", backend)), shots=a.shots,
-                ems=a.ems, p2_sim=a.p2 if a.backend == "noisy" else None, utc=stamp,
+                ems=a.ems, layout=a.layout, p2_sim=a.p2 if a.backend == "noisy" else None, utc=stamp,
                 qiskit=qiskit.__version__, assets=ASSETS, growth=GROWTH, fund=[ASSETS[i] for i in FUND],
                 note="Toy instance for hardware characterisation; not an advantage claim.")
     rec = dict(meta=meta, experiments=[])
@@ -209,12 +242,33 @@ def main():
     print(f"saved {path}")
     for r in rec["experiments"]:
         c, tot = r["counts"], sum(r["counts"].values())
-        if r["kind"] == "dicke":
+        if r["kind"] == "readout":
+            exp_ = r["expected"]
+            ok = c.get(exp_, 0) / tot
+            flips = [sum(v for s, v in c.items() if s[3 - q] != exp_[3 - q]) / tot for q in range(4)]
+            print(f"  {r['id']:<22} correct={ok:.3f}  per-qubit flip rate q0..q3={['%.3f' % f for f in flips]}"
+                  f"  physical={r['physical_qubits']}")
+        elif r["kind"] == "ghz":
+            n_ = r["n"]
+            ok = (c.get("0" * n_, 0) + c.get("1" * n_, 0)) / tot
+            print(f"  {r['id']:<22} P(all 0 or all 1)={ok:.3f}  (ideal 1.000)  physical={r['physical_qubits']}")
+        elif r["kind"] == "dicke":
             valid = sum(v for s, v in c.items() if s.count("1") == r["k"]) / tot
             print(f"  {r['id']:<22} valid={valid:.3f}  (chance {r['chance_valid']:.3f}, ideal 1.000)")
         else:
             good = sum(c.get(s, 0) for s in r["marked"]) / tot
             print(f"  {r['id']:<22} P(good)={good:.3f}  (ideal {r['p_good_ideal']:.3f})")
+
+
+def retrieve(path: Path, a) -> None:
+    rec = json.loads(path.read_text())
+    job_id = rec["meta"]["job_id"]
+    backend, _ = get_backend("q50", a.p2, rec["meta"].get("ems"))
+    result = backend.retrieve_job(job_id).result()
+    for i, r in enumerate(rec["experiments"]):
+        r["counts"] = {k.replace(" ", ""): int(v) for k, v in result.get_counts(i).items()}
+    path.write_text(json.dumps(rec, indent=1))
+    print(f"filled counts for job {job_id} into {path}")
 
 
 if __name__ == "__main__":

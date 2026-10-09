@@ -78,12 +78,19 @@ def qae_fit(recs: list[dict], n_boot: int = 300, seed: int = 0) -> dict:
     naive = hits[0] / shots[0]
     valid0 = sum(v for s, v in m0["counts"].items() if s.count("1") == m0["k"])
     return dict(variant=m0["variant"], a_exact=m0["a_exact"], a_hat=math.sin(th) ** 2, ci95=[float(lo), float(hi)],
-                fidelity_per_step=f, naive_m0=naive, naive_m0_postselected=hits[0] / max(valid0, 1),
+                fidelity_per_step=f, survival_per_grover_step=f * f, naive_m0=naive, naive_m0_postselected=hits[0] / max(valid0, 1),
                 ms=ms, p_good=[h / N for h, N in zip(hits, shots)], p_ideal=[r["p_good_ideal"] for r in recs],
                 two_qubit=[r["transpiled"]["two_qubit"] for r in recs], theta=th, pmix=pmix)
 
 
 def main(paths):
+    fig_sel = {}
+    for flag in ("--dicke", "--qae", "--qae2"):
+        if flag in paths:
+            i = paths.index(flag)
+            fig_sel[flag[2:]] = paths[i + 1]
+            del paths[i:i + 2]
+    paths = list(dict.fromkeys(paths + list(fig_sel.values())))
     if not paths:
         paths = sorted(str(p) for p in OUT.glob("hw_q50_*.json") if "summary" not in p.name)
     summary = {}
@@ -100,6 +107,7 @@ def main(paths):
             rs = [r for r in rec["experiments"] if r["kind"] == "qae" and r["variant"] == var]
             if rs:
                 B[var] = qae_fit(rs)
+        label = label + "@" + rec["meta"]["utc"]
         summary[label] = dict(file=str(p), meta=rec["meta"], dicke=A, qae=B)
         print(f"\n== {label}  ({rec['meta'].get('backend_name')}, {rec['meta']['utc']})")
         for a in A:
@@ -107,22 +115,25 @@ def main(paths):
                   f"TV-to-uniform {a['tv_uniform']:.3f}, 2q gates {a['two_qubit']}")
         for v, b in B.items():
             print(f"  QAE[{v}]: rank estimate {b['a_hat']:.3f} [{b['ci95'][0]:.3f}, {b['ci95'][1]:.3f}] "
-                  f"(exact {b['a_exact']:.3f}); fidelity/step {b['fidelity_per_step']:.2f}; "
+                  f"(exact {b['a_exact']:.3f}); signal surviving per Grover step {b['survival_per_grover_step']:.2f}; "
                   f"naive m=0 {b['naive_m0']:.3f}; P(good) {['%.2f' % x for x in b['p_good']]} "
                   f"vs ideal {['%.2f' % x for x in b['p_ideal']]}")
     if not summary:
         return
     (OUT / "hw_q50_summary.json").write_text(json.dumps(summary, indent=1, default=float))
-    plot(summary)
+    pick = lambda f: next((k for k, v in summary.items() if v["file"] == f), None)
+    plot(summary, pick(fig_sel.get("dicke")), pick(fig_sel.get("qae")), pick(fig_sel.get("qae2")))
 
 
-def plot(summary: dict):
+def plot(summary: dict, dk: str | None = None, qk: str | None = None, qk2: str | None = None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.rcParams.update({"font.size": 22, "axes.titlesize": 26, "axes.labelsize": 24, "legend.fontsize": 18})
     pref = next((k for k in summary if k.startswith("q50")), next(iter(summary)))
-    S = summary[pref]
+    dk = dk or next((k for k in summary if summary[k]["dicke"]), pref)
+    qk = qk or next((k for k in summary if summary[k]["qae"]), pref)
+    S = dict(summary[dk], qae=summary[qk]["qae"], meta=summary[qk]["meta"])
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(19.2, 10.8))
     # left: valid-portfolio share
     lab = [f"n={d['n']}\nk={d['k']}" for d in S["dicke"]]
@@ -141,15 +152,20 @@ def plot(summary: dict):
     a2.plot(mm, np.sin((2 * mm + 1) * math.asin(math.sqrt(b["a_exact"]))) ** 2, "k--", lw=2, label="ideal")
     d = b["fidelity_per_step"] ** (2 * mm + 1)
     a2.plot(mm, d * np.sin((2 * mm + 1) * b["theta"]) ** 2 + (1 - d) * b["pmix"], color="#1f78b4", lw=3,
-            label=f"fit (fidelity/step {b['fidelity_per_step']:.2f})")
+            label=f"noise-aware fit ({b['survival_per_grover_step']:.0%} signal/step)")
     a2.plot(b["ms"], b["p_good"], "o", color="#1f78b4", ms=16, label="measured")
+    if qk2:
+        b2 = summary[qk2]["qae"].get("rank")
+        lab2 = "measured + readout mitigation" if summary[qk2]["meta"].get("ems") else "measured (run 2)"
+        a2.plot(b2["ms"], b2["p_good"], "s", color="#d95f02", ms=14, label=lab2)
+    a2.axhline(b["pmix"], color="#999999", ls=":", lw=2, label="random-output level")
     a2.set_xticks(b["ms"])
     a2.set_ylim(0, 1.05)
     a2.set_xlabel("Grover steps m")
     a2.set_ylabel("P(portfolio worse than fund)")
-    a2.set_title(f"Rank estimate {b['a_hat']:.0%} (exact {b['a_exact']:.0%})")
-    a2.legend(loc="upper right")
-    name = S["meta"].get("backend_name", pref)
+    a2.set_title(f"Amplitude estimation: rank {b['a_hat']:.0%} (exact {b['a_exact']:.0%})")
+    a2.legend(loc="upper right", fontsize=15)
+    name = "VTT Q50" if S["meta"].get("backend") == "q50" else S["meta"].get("backend_name", pref)
     fig.suptitle(f"FairBench quantum core on {name}", fontsize=30, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(OUT / "hw_q50.png", dpi=100)
