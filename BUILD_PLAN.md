@@ -49,12 +49,12 @@ reads the rank as one amplitude. `tests/test_real_fund_quantum.py` checks that b
 
 | Step | Shown on | Result |
 |---|---|---|
-| 1–3 | one fictional mandate, hand-written spec | 18 rules read, checked against EU requirements, formula sheet written (`results/mandate_formula_sheet.md`). **Never run on a real prospectus; no live model call yet.** |
+| 1–3 | one fictional mandate, hand-written spec | 18 rules read, checked against EU requirements, formula sheet written (`results/mandate_formula_sheet.md`). **Not yet run on a real prospectus;** the team will write the real fund's rules by hand. No live model call has been made. |
 | 4 + 5 classical | Parnassus Core Equity, 27 real quarters | average rank 54 of 100 (luck: 50 ± 6); exclusions cost about 2 points |
 | 5 quantum, full universe | the same 27 quarters, simulated ideal device | ±1 point with a median of 1,900 queries against 5,366 classical samples; the gap grows with precision |
 | 5 quantum, exact check | the 16 largest index stocks each quarter | exact rank known; quantum off by 0.55 points on average, classical by 0.79 |
 | 5 quantum, circuit size | n = 476, k = 34 | about 949 error-corrected qubits, 5.0e+06 T gates per step |
-| Hardware | nothing yet | planned: Dicke-state quality and how fast the signal decays (see `QUANTUM_CORE.md` §8) |
+| Hardware | nothing yet | planned by the teammate with LUMI access: Dicke-state quality on a real device ("Item 3" below) |
 
 ## What "the manager's skill" can and cannot mean here
 
@@ -65,8 +65,8 @@ then it is a statement about ranks, not a proof.
 
 ## Gaps between this and the product in the pitch
 
-1. **Steps 1–3 on a real document.** Run the Parnassus prospectus through the reader and replace the proxy rule set
-   (holdings count plus exclusions by SEC industry code) with rules that carry real quotes.
+1. **Steps 1–3 on a real document.** The team writes the Parnassus rules by hand (no model call on the real
+   prospectus); they then replace the proxy rule set (holdings count plus exclusions by SEC industry code).
 2. **ESG and carbon data.** Rules that need a vendor's scores stay "unobservable" until a licensed source is plugged in.
 3. **Regional texts.** Most thresholds in `mandates/regions.py` are marked unverified until re-read against the law.
 4. **Hardware.** A small real-device run for the "was quantum used in practice" criterion.
@@ -75,13 +75,49 @@ then it is a statement about ranks, not a proof.
 
 ## Plan from here
 
-| # | What | Needs | Feeds |
+Decided with the team on 2026-10-09.
+
+| # | What | Who | Feeds |
 |---|---|---|---|
-| 1 | One-command demo: document ─▶ formula sheet ─▶ real fund rank ─▶ quantum estimate ─▶ figure, from committed results (no network) | nothing | the recorded demo |
-| 2 | Real prospectus through steps 1–3 | an Anthropic key (one call), or a hand-written spec | "the chatbot reads the mandate" |
-| 3 | Hardware run: circuits and a scoring script prepared offline; a teammate submits them | device access | "quantum in practice" |
-| 4 | Deck, 3-minute script, Q&A sheet (`PITCH_PLAN.md` tasks 4–7) | items 1–3 | the submission, Saturday 09:30 |
+| 1 | One-command demo from committed results (no network): document ─▶ formula sheet ─▶ real fund rank ─▶ quantum estimate ─▶ figure | this repo: `scripts/demo_pipeline.py` | the recorded demo |
+| 2 | The real fund's rules, **written by hand** by the team with their own prompt or skill. No model call on the real prospectus. | team | replaces the proxy rule set |
+| 3 | Small run on a real quantum computer through LUMI | the teammate with LUMI access, from his own checkout | "quantum in practice" |
+| 4 | Deck, 3-minute script, Q&A sheet (`PITCH_PLAN.md`) | team, in progress; not started in this repo | the submission, Saturday 09:30 |
 | 5 | After the event: more funds and quarters; a licensed ESG source; verified regional texts; quantum for weights | — | a claim about skill that has statistical power |
+
+### Item 2: handing over hand-written rules
+
+Write the rules as a rule spec, the same JSON the reader produces. `examples/mandate_example.rules.json` is a complete
+example and `fairbench/rules.py` (`RULE_FIELDS`) lists every rule kind and its fields. `fairbench/mandate.py` holds the
+system prompt the reader uses (`SYSTEM_PROMPT`), which is a ready description of the format for any prompt or skill.
+
+- Every rule needs `source`: the sentence copied word for word from the document. The checker rejects a rule whose
+  quote is not in the text, or whose numbers are not in its quote.
+- Save the policy text as `<name>.txt` and the spec beside it as `<name>.rules.json`, then:
+  `.venv/bin/python scripts/mandate_formula_sheet.py --mandate <name>.txt --region US --reviewer "<your name>"`
+  This writes the formula sheet and the regional check. It currently compiles against a synthetic universe.
+- What the REAL universe can support today: the number of holdings; exclusions by the groups in
+  `results/real_fund_parnassus_core_equity_exclusions.csv` (fossil fuels, tobacco, alcohol makers, weapons, from SEC
+  industry codes); position and group weight limits. It has no ESG scores, no carbon figures and no sector labels, so
+  rules on those will be recorded as "unobservable" and not enforced.
+- Still to build once a real spec exists: feeding its enforced rules into `scripts/real_fund_attribution.py` in place
+  of `--exclude-file` (about half a session; `run_period` already accepts `selection_rules` and `weight_rules`).
+
+### Item 3: the hardware run (owner: the teammate with LUMI access)
+
+Purpose: one honest slide on the gap between the circuit and today's machines. It is a feasibility measurement, not
+an advantage claim (`QUANTUM_CORE.md` §5 and §8).
+
+- **What to run.** The Dicke state alone, at a few small sizes (for example n = 4, k = 2; n = 6, k = 3; n = 8, k = 4),
+  from `fairbench.quantum.dicke.dicke_state(n, k)` plus measurement. If time allows, one Grover step on the smallest.
+- **What to report per size.** The share of shots with exactly k ones (the circuit is supposed to produce nothing
+  else); among those, the distance from "every k-subset equally likely" (`fairbench.metrics.tv_to_uniform`, with
+  `tv_expected_uniform` as the sampling-noise floor); transpiled depth and two-qubit gate count on the device;
+  shots, device name and date.
+- **Where the code stands.** `fairbench.backends.sample` runs on the Aer simulators only; its `"ibm"` and `"vtt"`
+  backends are stubs that raise `NotImplementedError`. The device call is the piece to write. The simulator numbers to
+  compare with are in `scripts/qae_noise.py` and `results/qae_noise*`.
+- **Where results go.** `results/hardware_<device>.json`, then one row in the "What has been shown" table above.
 
 ---
 

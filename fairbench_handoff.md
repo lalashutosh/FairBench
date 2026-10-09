@@ -14,10 +14,11 @@ _Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 
 **The real result.** Price growth: fund +135%, S&P 500 index fund +149%, typical 36-stock portfolio under the same rules +105%. Average quarterly rank among rule-abiding portfolios: 54 of 100 (luck alone: 50 give or take 6). The exclusions cost about 2 points. It must always carry: *proxy rules (holdings count plus 27 companies excluded by SEC industry code), price returns without dividends, one fund, not a measure of skill.*
 
-**Do next.**
-1. **The plan table at the top of `BUILD_PLAN.md`**, in order: one-command demo, a real prospectus through the reader, the hardware run, then the deck, script and Q&A sheet that `PITCH_PLAN.md` asks for (one pptx, 3 minutes, due Saturday 2026-10-10 09:30).
-2. **Run the AI layer against the live API** (never done): the user sets `ANTHROPIC_API_KEY`, then `.venv/bin/python scripts/demo_mandate.py --live`.
-3. **Optional:** a second fund (series ids in the memo §3; it needs an index fund that reports on the same months); a real prospectus through `fairbench/mandates/extract.py`; a hardware feasibility run.
+**Do next** (decided with the team on 2026-10-09; detail in `BUILD_PLAN.md` → "Plan from here").
+1. **Demo:** `scripts/demo_pipeline.py` shows the whole pipeline from committed results, for the recording.
+2. **Real rules by hand:** the team writes the real fund's rule spec with their own prompt or skill; no model call on the real prospectus. Once it exists, wire it into `scripts/real_fund_attribution.py` in place of the proxy exclusion list.
+3. **Hardware:** the teammate with LUMI access runs the small Dicke-state measurement from his own checkout (`BUILD_PLAN.md` → "Item 3").
+4. **Deck, script, Q&A sheet:** the team is working on them; not started in this repo (`PITCH_PLAN.md`, due Saturday 2026-10-10 09:30).
 
 **Where to look.**
 
@@ -36,7 +37,7 @@ _Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 - Core: the default benchmark is the median random portfolio of the same size; the model never sees per-asset values; shares and averages in a mandate are read as equal-weight statements; a holdings range is benchmarked at the fund's actual count; risk limits use the universe covariance with equal weights.
 
 **Gaps.**
-- No live model call has ever been made; the mandate layer is tested with a fake client.
+- No live model call has ever been made, and none is planned on the real prospectus: the team writes those rules by hand. The mandate layer is tested with a fake client.
 - Real funds: one fund only; the fund's own ESG screen cannot be reproduced from public data; no dividends; the latest date is two months behind.
 - Quantum: simulator only. The oracle encodes linear rules; minimum-groups and the two risk caps are not encodable; the penalty Hamiltonian covers the original five rules. Amplitude-estimation numbers are noiseless query counts on synthetic data, never a speedup.
 - Deck numbers (slides 4, 5, 9) must be updated by hand if a demo is re-run with other settings.
