@@ -70,6 +70,13 @@ It prints the attribution for a synthetic 100-asset case, then repeats a 16-asse
 classical rejection, the Dicke circuit and exact enumeration to show they agree. Outputs go to
 `results/attribution_demo.{png,json}` and `results/attribution_samplers.csv`.
 
+See the whole pipeline in one command (a policy text to formulas, the real fund's rank, the quantum estimate;
+no network, a few seconds):
+
+```bash
+.venv/bin/python scripts/demo_pipeline.py
+```
+
 Run the tests (about 40 s):
 
 ```bash
