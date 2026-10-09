@@ -219,6 +219,17 @@ export FAIRBENCH_SEC_USER_AGENT="Your Project Name contact@your-domain.org"
 .venv/bin/python scripts/real_fund_figure.py --name parnassus_core_equity --short-name "Parnassus Core Equity"
 ```
 
+The same quarters through the quantum estimator (a noiseless simulation; see [`QUANTUM_CORE.md`](QUANTUM_CORE.md)), and a
+policy text turned into its formula sheet with the region's requirements checked (fictional example, offline):
+
+```bash
+.venv/bin/python scripts/real_fund_quantum.py --fund-dir data/nport/S000000856 --parent-dir data/nport/S000004310 --price-dir data/nport/S000004347 --exclude-file data/exclusions_sic.csv --name parnassus_core_equity
+```
+
+```bash
+.venv/bin/python scripts/mandate_formula_sheet.py
+```
+
 `S000000856` is Parnassus Core Equity and `S000004310` is iShares Core S&P 500, used as the
 stand-in for its universe and benchmark weights. `S000004347` is iShares Russell 1000, used only to
 price companies after they leave the S&P 500. The exclusion list is a stand-in built from the SEC's
@@ -289,10 +300,12 @@ fairbench/
   ft/                                       fault-tolerant oracle and resource model (amplitude amplification)
   apps/attribution.py                       the attribution tool (synthetic universes)
   apps/real_fund.py                         a real fund against its feasible portfolios, period by period
+  apps/real_fund_quantum.py                 the same period handed to the quantum estimator
   ingest/                                   SEC client and raw archive, N-PORT and EDGAR parsers, identifiers,
                                             document parser, return sources, ingestion pipeline
   store/                                    SQLite schema and helpers; every row carries its provenance
-  mandates/                                 canonical constraints: hard/soft wording, evidence checks, compilers
+  mandates/                                 canonical constraints: hard/soft wording, evidence checks, regional
+                                            rule packs, the formula sheet, compilers
   portfolio/                                weight grid, reference distributions, exact validator, MILP, holdings changes
   quantum/encoding.py                       Stage 2 (weights) as binary variables and a QUBO
 examples/                                   a fictional mandate and its rule spec; a synthetic N-PORT example

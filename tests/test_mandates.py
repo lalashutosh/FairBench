@@ -76,6 +76,9 @@ def cons(doc, u):
     ("The Fund may invest up to 20% in foreign securities.", "soft"),
     ("The Fund will generally not invest more than 5% in any issuer.", "soft"),
     ("The Fund invests in large companies.", "soft"),
+    ("No single holding may exceed 7% of the portfolio.", "hard"),
+    ("The Fund holds between 18 and 22 positions.", "hard"),
+    ("The Fund normally holds between 35 and 45 securities.", "soft"),
 ])
 def test_wording_classification(text, kind):
     assert classify(text).constraint_type == kind
@@ -174,7 +177,7 @@ def test_review_then_hard_only_and_soft_promoted(cons):
     hard = select(cons)
     assert [c.metric for c in hard.enforced] == ["eligibility", "group_weight", "position_weight"]
     reasons = {c.constraint_id: why for c, why in hard.not_enforced}
-    assert reasons[cons[0].constraint_id].startswith("soft wording (normally")
+    assert reasons[cons[0].constraint_id].startswith("soft wording (") and "normally" in reasons[cons[0].constraint_id]
     assert reasons[cons[5].constraint_id] == "no numeric form"
     assert reasons[cons[7].constraint_id] == "no numeric form"            # the invented threshold has no target
     assert reasons[cons[8].constraint_id] == "no numeric form"
@@ -278,3 +281,86 @@ def test_extract_constraints_uses_the_single_model_entry_point(doc, u):
     cons, spec = extract_constraints(doc, u, fund_id="S000000001", client=client)
     assert spec == SPEC and len(cons) == len(SPEC["rules"])
     assert Q_TOBACCO in client.beta.messages.kw["messages"][0]["content"]
+
+
+# ------------------------------------------------------- regional packs and the formula sheet
+def test_regional_rules_that_apply():
+    from fairbench.mandates.regions import applicable_rules, name_categories
+    us = {r.rule_id for r in applicable_rules("US", fund_name="Synthetic ESG Fund")}
+    assert us == {"us_names_rule_80", "us_diversified_75_5", "us_concentration_25", "us_ric_issuer_25"}
+    assert "us_diversified_75_5" not in {r.rule_id for r in applicable_rules("US", fund_name="X", diversified=False)}
+    assert name_categories("Global Sustainable Equity") == {"name_pab", "name_any"}
+    assert name_categories("Energy Transition Leaders") == {"name_ctb", "name_any"}
+    assert name_categories("Global Equity Income") == set()
+    eu = {r.rule_id for r in applicable_rules("EU", fund_name="Global Sustainable Equity")}
+    assert {"eu_name_80", "eu_excl_tobacco", "eu_excl_coal_1pct", "eu_excl_oil_10pct"} <= eu and "eu_pab_intensity_50" not in eu
+    lighter = {r.rule_id for r in applicable_rules("EU", fund_name="Energy Transition Leaders")}
+    assert "eu_excl_controversial_weapons" in lighter and "eu_excl_coal_1pct" not in lighter
+    assert not applicable_rules("EU", fund_name="Global Equity Income", diversified=False)
+    assert "eu_pab_intensity_50" in {r.rule_id for r in applicable_rules("EU", fund_name="Paris Aligned", claims_pab=True)}
+    with pytest.raises(ValueError):
+        applicable_rules("APAC")
+
+
+def test_regional_constraints_are_labelled_and_never_enforced_without_data(u):
+    from fairbench.mandates.regions import applicable_rules, regional_constraints
+    reg = regional_constraints(applicable_rules("US", fund_name="Synthetic ESG Fund"), u, fund_id="F")
+    by = {c.regulatory_basis: c for c in reg}
+    assert all(c.constraint_type == "regulatory" and c.source_url for c in reg)
+    assert by["us_names_rule_80"].status == "disclosed" and by["us_names_rule_80"].observability == "unobservable"
+    assert by["us_names_rule_80"].compile_target is None            # which holdings are "in focus" is not public
+    assert by["us_ric_issuer_25"].status == "assumed" and by["us_ric_issuer_25"].compile_target["max_weight"] == 0.25
+    assert "not re-read" in by["us_ric_issuer_25"].note
+    assert by["us_concentration_25"].observability == "observable" and by["us_diversified_75_5"].compile_target is None
+    eu = regional_constraints(applicable_rules("EU", fund_name="Sustainable Fund"), u, fund_id="F", proxies={"tobacco"})
+    eb = {c.regulatory_basis: c for c in eu}
+    assert eb["eu_excl_tobacco"].observability == "proxy" and eb["eu_excl_tobacco"].compile_target["values"] == ["tobacco"]
+    assert eb["eu_excl_coal_1pct"].observability == "unobservable" and eb["eu_excl_coal_1pct"].compile_target is None
+
+
+def test_mandate_is_checked_against_the_region(cons):
+    from fairbench.mandates.regions import applicable_rules, check_mandate
+    f = {x["rule_id"]: x for x in check_mandate(cons, applicable_rules("US", fund_name="Synthetic ESG Fund"))}
+    assert f["us_concentration_25"]["verdict"] == "at least as strict"      # the fund also says 25% per industry
+    assert f["us_ric_issuer_25"]["verdict"] == "at least as strict"         # 5% per issuer is tighter than 25%
+    assert f["us_names_rule_80"]["verdict"] == "at least as strict" and "for a person to judge" in f["us_names_rule_80"]["why"]
+    assert f["us_diversified_75_5"]["verdict"] == "not comparable"
+    eu = {x["rule_id"]: x for x in check_mandate(cons, applicable_rules("EU", fund_name="Sustainable Fund"))}
+    assert eu["eu_excl_tobacco"]["verdict"] == "at least as strict" and eu["eu_excl_coal_1pct"]["verdict"] == "silent"
+    loose = [c for c in cons if c.metric == "position_weight"][0]
+    loose.compile_target["max_weight"] = 0.40
+    assert {x["rule_id"]: x for x in check_mandate(cons, applicable_rules("US", fund_name="X"))}["us_ric_issuer_25"]["verdict"] == "weaker"
+
+
+def test_formula_sheet_states_every_rule_its_formula_and_its_fate(cons, u):
+    from fairbench.mandates.formulas import formula_sheet
+    from fairbench.mandates.regions import applicable_rules, check_mandate
+    approve(cons, reviewer="A. Reviewer")
+    findings = check_mandate(cons, applicable_rules("US", fund_name="Synthetic ESG Fund"))
+    sheet = formula_sheet(cons, u, 40, fund_name="Synthetic Example Equity Fund", regional_findings=findings)
+    assert sheet.count("## Rule ") == len(cons)
+    assert Q_TOBACCO in sheet and "x_i = 0 for every i in the excluded group" in sheet
+    assert "Σ_{i∈s} w_i ≤ c for each sector s" in sheet and "floor(25% x 40) = 10 names" in sheet
+    assert "encodable exactly (a count)" in sheet
+    assert "no: soft wording (between ... and, normally)" in sheet and "no: no numeric form" in sheet
+    assert "no: the data it needs is not public (unobservable)" in sheet
+    assert "## Regional requirements" in sheet and "Industry concentration: 25%" in sheet
+    assert "## What the enforced rules leave" in sheet and "satisfy" in sheet
+    soft = formula_sheet(cons, u, 40, promote_soft=True)
+    assert "weighted sum with integer-quantised coefficients" in soft            # the carbon average joins when soft rules count
+    assert soft.count("**Enforced:** yes") > sheet.count("**Enforced:** yes")
+
+
+def test_number_words_ground_a_share(doc, u):
+    from fairbench.ingest.documents import parse_text
+    text = "The Fund invests at least half of the portfolio in large companies. The worst-scoring fifth is excluded."
+    spec = {"fund_name": "", "rules": [
+        _rule("group_limit", "The Fund invests at least half of the portfolio in large companies.", by="flag",
+              values=["large_cap"], bound="min", limit=0.5, unit="weight"),
+        _rule("exclude_threshold", "The worst-scoring fifth is excluded.", metric="esg", side="below", value=20.0,
+              basis="percentile", scope="universe"),
+        _rule("group_limit", "The Fund invests at least half of the portfolio in large companies.", by="flag",
+              values=["large_cap"], bound="min", limit=0.6, unit="weight")]}
+    a, b, c = constraints_from_spec(spec, parse_text(text), u, fund_id="F")
+    assert a.status == "disclosed" and a.value == 0.5 and b.status == "disclosed" and b.value == 20.0
+    assert c.status == "unknown" and c.value is None            # 0.6 is not "half": still rejected

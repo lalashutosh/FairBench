@@ -1,3 +1,92 @@
+# Architecture and plan (2026-10-09): the current source of truth
+
+_This section replaces the plans below, which are kept as the history of how each piece was built. The quantum
+core's own reference is `QUANTUM_CORE.md`; results on the real fund are in `REAL_FUND_RESULTS.md`._
+
+## One pipeline, two estimators
+
+```
+1 READ       the fund's documents ─▶ rules, each with the sentence it came from
+             mandate.py (the one model call) ─▶ mandates/extract.py (quote check, number check, hard/soft wording)
+
+2 CHECK      add what the fund's REGION requires and compare
+             mandates/regions.py   US: names rule 80%, diversification, 25% industry, 25% issuer
+                                   EU: fund-name 80%, Paris-aligned / transition exclusions, benchmark carbon rules
+
+3 FORMULAS   the formula sheet: every rule as mathematics on x (which stocks) and w (how much),
+             with this universe's numbers, how the quantum oracle can hold it, and whether it is enforced
+             mandates/formulas.py ─▶ a person reviews (dsl.approve) ─▶ compile.select ─▶ the enforced rule set
+
+4 DATA       public filings ─▶ universe, benchmark weights, returns, the fund's portfolio, per quarter
+             ingest/ (SEC) ─▶ apps/real_fund.build_period_case ─▶ PeriodCase
+
+5 ESTIMATE   "among portfolios the rules allow, where does the fund's return rank?"
+             ├─ classical   portfolio/reference.py + apps/real_fund.run_period        today's product
+             └─ quantum     apps/real_fund_quantum.quantum_inputs ─▶ qae/ (amplitude estimation)
+                            ft/oracle.py (the circuit), ft/resources.py (its size)     simulated; fault-tolerant era
+
+6 REPORT     rank per quarter, the average and its error bar, what the rules cost, the checks
+             scripts/reproducibility_report.py ─▶ REAL_FUND_RESULTS.md ; scripts/real_fund_figure.py
+```
+
+**The contract between steps 3–4 and step 5** is one object for both estimators: a `Universe` (asset order = qubit
+order), a `ConstraintSet` containing `Cardinality(k)`, and the fund's return as a threshold. The classical estimator
+draws portfolios and counts those below the threshold. The quantum estimator puts the threshold inside the oracle and
+reads the rank as one amplitude. `tests/test_real_fund_quantum.py` checks that both answer the same question.
+
+## What each estimator can take
+
+| | Classical sampling | Quantum core |
+|---|---|---|
+| Counting rules (holdings, exclusions, sector and group counts) | yes | yes, exactly |
+| Averages (ESG floor, carbon cap) | yes | yes, with integer-rounded coefficients |
+| Minimum number of sectors; volatility and tracking-error caps | yes | no: enforced by a classical check |
+| Equal weights; benchmark-proportional weights | yes | yes (the comparison is linear in the selection) |
+| Capped benchmark weights (the real-fund headline), the weight grid, the benchmark-aware tilt | yes | no: not linear |
+| The whole return distribution from one run | yes | no: one number per run |
+
+## What has been shown, and on what
+
+| Step | Shown on | Result |
+|---|---|---|
+| 1–3 | one fictional mandate, hand-written spec | 18 rules read, checked against EU requirements, formula sheet written (`results/mandate_formula_sheet.md`). **Never run on a real prospectus; no live model call yet.** |
+| 4 + 5 classical | Parnassus Core Equity, 27 real quarters | average rank 54 of 100 (luck: 50 ± 6); exclusions cost about 2 points |
+| 5 quantum, full universe | the same 27 quarters, simulated ideal device | ±1 point with a median of 1,900 queries against 5,366 classical samples; the gap grows with precision |
+| 5 quantum, exact check | the 16 largest index stocks each quarter | exact rank known; quantum off by 0.55 points on average, classical by 0.79 |
+| 5 quantum, circuit size | n = 476, k = 34 | about 949 error-corrected qubits, 5.0e+06 T gates per step |
+| Hardware | nothing yet | planned: Dicke-state quality and how fast the signal decays (see `QUANTUM_CORE.md` §8) |
+
+## What "the manager's skill" can and cannot mean here
+
+The output is the fund's rank among portfolios its rules allowed, quarter by quarter. One quarter says nothing. Over
+27 quarters the average rank has an error bar of about 6 points, so only an average above roughly 61 or below 39 could
+be told apart from luck; Parnassus sits at 54. A claim about skill needs more quarters, more funds, or both, and even
+then it is a statement about ranks, not a proof.
+
+## Gaps between this and the product in the pitch
+
+1. **Steps 1–3 on a real document.** Run the Parnassus prospectus through the reader and replace the proxy rule set
+   (holdings count plus exclusions by SEC industry code) with rules that carry real quotes.
+2. **ESG and carbon data.** Rules that need a vendor's scores stay "unobservable" until a licensed source is plugged in.
+3. **Regional texts.** Most thresholds in `mandates/regions.py` are marked unverified until re-read against the law.
+4. **Hardware.** A small real-device run for the "was quantum used in practice" criterion.
+5. **Quantum for weights.** The capped and grid weightings need amplitude estimation on the weight encoding; not built.
+6. **Europe.** The rule pack exists; there is no free European source of fund holdings.
+
+## Plan from here
+
+| # | What | Needs | Feeds |
+|---|---|---|---|
+| 1 | One-command demo: document ─▶ formula sheet ─▶ real fund rank ─▶ quantum estimate ─▶ figure, from committed results (no network) | nothing | the recorded demo |
+| 2 | Real prospectus through steps 1–3 | an Anthropic key (one call), or a hand-written spec | "the chatbot reads the mandate" |
+| 3 | Hardware run: circuits and a scoring script prepared offline; a teammate submits them | device access | "quantum in practice" |
+| 4 | Deck, 3-minute script, Q&A sheet (`PITCH_PLAN.md` tasks 4–7) | items 1–3 | the submission, Saturday 09:30 |
+| 5 | After the event: more funds and quarters; a licensed ESG source; verified regional texts; quantum for weights | — | a claim about skill that has statistical power |
+
+---
+
+# History: how each piece was built (wave-by-wave log)
+
 # FairBench P0 build plan
 
 Source of truth for interfaces: `fairbench_handoff.md`. This file = execution plan only.

@@ -23,6 +23,8 @@ HARD_TERMS: tuple[tuple[str, str], ...] = (
     ("must", r"\bmust\b"),
     ("shall", r"\bshall\b"),
     ("may not", r"\bmay\s+not\b"),
+    ("no ... may", r"\bno\b[^.;:]{0,80}?\bmay\b"),          # "No single holding may exceed 7%"
+    ("between ... and", r"\bbetween\b[^.;:]{0,40}?\band\b"),  # a stated range is a floor and a ceiling
     ("will not", r"\bwill\s+not\b"),
     ("does not invest", r"\bdo(?:es)?\s+not\s+invest\b"),
     ("cannot", r"\bcan\s*not\b"),
@@ -81,7 +83,9 @@ def classify(evidence: str) -> Modality:
     """Classify the wording of one quoted rule."""
     text = " ".join(evidence.split()).casefold().replace("’", "'")
     hard = tuple(name for name, pat in HARD_TERMS if re.search(pat, text))
-    soft = tuple(name for name, pat in SOFT_TERMS if re.search(pat, text))
+    # a "may" that belongs to a prohibition ("may not", "no ... may") is not a hedge
+    hedged = re.sub(r"\bmay\s+not\b|\bno\b[^.;:]{0,80}?\bmay\b", " ", text)
+    soft = tuple(name for name, pat in SOFT_TERMS if re.search(pat, hedged if name == "may" else text))
     basis = next((name for name, pat in _REGULATORY if re.search(pat, text)), None)
     kind = "hard" if hard and not soft else "soft"
     return Modality(kind, hard, soft, basis, unmarked=not hard and not soft)

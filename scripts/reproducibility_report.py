@@ -77,6 +77,44 @@ def real_sections(name: str) -> str:
     start, end = periods[0]["period_start"], periods[-1]["period_end"]
     reasons = "" if excl is None else "; ".join(f"{n} {why.split(' (')[0]}" for why, n in excl.groupby("reason").size().items())
 
+    qfile = res / f"real_fund_{name}_quantum.json"
+    if qfile.exists():
+        q = json.loads(qfile.read_text())
+        sl, rs = q["sleeve"], q["resources_last_period"]
+        scale = "\n".join(f"| ±{r['eps_points']:g} | {r['quantum_queries']:,.0f} | {r['classical_samples']:,.0f} | {r['ratio']:.1f}× |"
+                          for r in q["scaling_last_period"])
+        quantum = f"""## The same quarters through the quantum estimator
+
+The quantum core (`QUANTUM_CORE.md`) was given exactly the same inputs: the universe, the rules, the fund's return.
+It answers the equal-weight version of the question, the one its circuit can express. Everything in this section is a
+noiseless **simulation** and counts oracle queries, not time. One query is one check of one portfolio.
+
+- **It gets the same answer.** On the {int(np.median([r['n'] for r in sl['rows']]))} largest index stocks, where every portfolio can be listed and the
+  exact rank is known, the simulated quantum estimate was off by {sl['mean_abs_error_quantum']:.2f} points on average over {sl['n_periods']} quarters;
+  classical sampling with the same number of queries was off by {sl['mean_abs_error_classical_same_queries']:.2f}.
+- **It needs fewer queries, and the gap widens with precision.** To pin the fund's rank to ±{q['eps_points']:g} point on the full
+  universe: a median of {q['median_quantum_queries']:,.0f} quantum queries against {q['median_classical_samples']:,.0f} classical samples
+  ({q['median_query_ratio']:.1f}× fewer). For the latest quarter:
+
+| Precision (points) | Quantum queries | Classical samples | Ratio |
+|---|---|---|---|
+{scale}
+
+- **Under these rules that is the only gain.** {valid.capitalize()} so there is no rarity to exploit. A mandate
+  with caps and ESG or carbon averages leaves far fewer valid portfolios, and that is where the second gain appears
+  (classical cost grows like 1/share, quantum like 1/√share).
+- **It cannot run on a machine that exists.** The full-universe circuit needs about {rs['logical_qubits']:,} error-corrected qubits
+  and {rs['t_gates_per_step']:.1e} T gates per step. Each quantum query would also be far slower than a laptop's check, so
+  this is fewer queries, not less time. What may and may not be claimed: `QUANTUM_CORE.md` section 5.
+"""
+    else:
+        quantum = f"""## What this run says about quantum
+
+Under these rules {valid} so there is nothing for a quantum sampler to speed up through rarity. Run
+`scripts/real_fund_quantum.py` to put the quantum estimator on the same quarters. What may and may not be claimed:
+`QUANTUM_CORE.md` section 5.
+"""
+
     pct = lambda v: f"{100 * v:+.1f}%"
     table = pd.DataFrame({
         "quarter ending": [p["period_end"] for p in periods],
@@ -153,14 +191,7 @@ at the fund's own largest position). "Exclusions' effect" is how much the exclus
   are drawn from, and the result says so each quarter.
 - Every random portfolio is re-checked against the rules after it is drawn: {violations} violations.
 
-## What this run says about quantum
-
-Under these rules {valid} so there is nothing for a
-quantum sampler to speed up here: a laptop draws {run['n_samples']:,} valid portfolios per quarter in about a second.
-A quantum method can only help when valid portfolios are extremely rare (the earlier studies in `BUILD_PLAN.md` put
-the break-even near one valid portfolio in a billion), and no machine available today can run the circuits that
-would need. What may and may not be claimed is in `BUILD_PLAN.md` under "QA results".
-
+{quantum}
 ## Repeat it
 
 The commands are in `README.md` under "Real funds from public filings". Another fund needs its SEC series id and

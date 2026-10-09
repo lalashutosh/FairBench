@@ -26,6 +26,7 @@ reviewer (``dsl.approve``).
 from __future__ import annotations
 
 import hashlib
+import re
 
 from ..data import Universe
 from ..ingest.documents import ParsedDocument, count_quote, locate_quote, number_appears, parse_text
@@ -56,11 +57,21 @@ def _rule_numbers(r: dict) -> list[float]:
     return []
 
 
+# number words a quote may use for a share or a percentile ("at least half", "the worst-scoring fifth")
+_WORD_FRACTIONS = {"half": 0.5, "third": 1 / 3, "quarter": 0.25, "fifth": 0.2, "tenth": 0.1}
+
+
+def _word_fraction(value: float, text: str) -> bool:
+    low = text.casefold()
+    return any(re.search(rf"\b{w}\b", low) and (abs(value - f) < 1e-9 or abs(value - 100 * f) < 1e-9)
+               for w, f in _WORD_FRACTIONS.items())
+
+
 def _grounded(value: float, r: dict, text: str) -> bool:
     """Is this number in the quote? A level given relative to a benchmark is written as a
     difference ("30% below" for 0.7), and "better than the benchmark" (1.0) states no
     number at all."""
-    if number_appears(value, text):
+    if number_appears(value, text) or _word_fraction(value, text):
         return True
     if r.get("basis") == "relative_to_mean" and value == r.get("value"):
         return value == 1.0 or number_appears(abs(1.0 - value), text)

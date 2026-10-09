@@ -1,6 +1,6 @@
 # FairBench on a real fund: results and checks
 
-_Generated 2026-10-09 by `scripts/reproducibility_report.py` from commit `4a41d36`. Do not edit by
+_Generated 2026-10-09 by `scripts/reproducibility_report.py` from commit `385bdec`. Do not edit by
 hand; re-run the script. Python 3.11.9, numpy 2.4.6, pandas 3.0.6, scipy 1.17.1,
 qiskit 2.5.2._
 
@@ -98,13 +98,33 @@ at the fund's own largest position). "Exclusions' effect" is how much the exclus
   are drawn from, and the result says so each quarter.
 - Every random portfolio is re-checked against the rules after it is drawn: 0 violations.
 
-## What this run says about quantum
+## The same quarters through the quantum estimator
 
-Under these rules every random draw is already a valid portfolio, so there is nothing for a
-quantum sampler to speed up here: a laptop draws 5,000 valid portfolios per quarter in about a second.
-A quantum method can only help when valid portfolios are extremely rare (the earlier studies in `BUILD_PLAN.md` put
-the break-even near one valid portfolio in a billion), and no machine available today can run the circuits that
-would need. What may and may not be claimed is in `BUILD_PLAN.md` under "QA results".
+The quantum core (`QUANTUM_CORE.md`) was given exactly the same inputs: the universe, the rules, the fund's return.
+It answers the equal-weight version of the question, the one its circuit can express. Everything in this section is a
+noiseless **simulation** and counts oracle queries, not time. One query is one check of one portfolio.
+
+- **It gets the same answer.** On the 16 largest index stocks, where every portfolio can be listed and the
+  exact rank is known, the simulated quantum estimate was off by 0.55 points on average over 27 quarters;
+  classical sampling with the same number of queries was off by 0.79.
+- **It needs fewer queries, and the gap widens with precision.** To pin the fund's rank to ±1 point on the full
+  universe: a median of 1,900 quantum queries against 5,366 classical samples
+  (2.4× fewer). For the latest quarter:
+
+| Precision (points) | Quantum queries | Classical samples | Ratio |
+|---|---|---|---|
+| ±2 | 1,400 | 2,004 | 1.4× |
+| ±1 | 2,800 | 8,014 | 2.9× |
+| ±0.5 | 3,100 | 32,058 | 10.3× |
+| ±0.2 | 10,200 | 200,359 | 19.6× |
+| ±0.1 | 40,300 | 801,438 | 19.9× |
+
+- **Under these rules that is the only gain.** Every random draw is already a valid portfolio, so there is no rarity to exploit. A mandate
+  with caps and ESG or carbon averages leaves far fewer valid portfolios, and that is where the second gain appears
+  (classical cost grows like 1/share, quantum like 1/√share).
+- **It cannot run on a machine that exists.** The full-universe circuit needs about 949 error-corrected qubits
+  and 5.0e+06 T gates per step. Each quantum query would also be far slower than a laptop's check, so
+  this is fewer queries, not less time. What may and may not be claimed: `QUANTUM_CORE.md` section 5.
 
 ## Repeat it
 
