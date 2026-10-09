@@ -6,6 +6,7 @@ Cases where one rank step 1/|F| exceeds the tolerance (floor_1F) are left out, a
 Outputs results/qae_hybrid_pitch.{png,svg} at 16:9.
 """
 import json
+import math
 import os
 
 import matplotlib
@@ -68,9 +69,13 @@ def main():
 
     # ratio callouts: where classical wins, and the tightest case
     r0, r1 = rej[0] / hyb[0], rej[-1] / hyb[-1]
-    ax.annotate(f"{r1:.0f}× fewer queries\nthan classical sampling", (pf[-1], hyb[-1] / 4.5), xytext=(-10, 0),
-                textcoords="offset points", ha="right", va="center", color=C_HYB, fontsize=28, fontweight="bold")
-    ax.vlines(pf[-1] / 1.08, hyb[-1] * 1.25, rej[-1] / 1.25, color=MUTED, lw=1.5)
+    # double-headed arrow spanning the gap at the tightest case, with the callout attached to it
+    xg = pf[-1] * 1.18                      # just left of the last points (x axis runs loose -> tight)
+    ax.annotate("", xy=(xg, hyb[-1] * 1.12), xytext=(xg, rej[-1] / 1.12),
+                arrowprops=dict(arrowstyle="<->", color=C_HYB, lw=3, shrinkA=0, shrinkB=0))
+    ax.annotate(f"{r1:.0f}× fewer queries\nthan classical sampling", (xg, hyb[-1] / 4.5),
+                xytext=(0, 0), textcoords="offset points", ha="right", va="center", color=C_HYB,
+                fontsize=28, fontweight="bold")
     ax.annotate(f"loose rules:\nclassical wins ({1 / r0:.1f}×)", (pf[0], rej[0]), xytext=(0, -30),
                 textcoords="offset points", ha="left", va="top", color=MUTED, fontsize=19)
 
