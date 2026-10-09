@@ -15,10 +15,15 @@ small case with rejection sampling and with the Dicke circuit on ``aer_statevect
 and compares both with exact enumeration: the quantum sampler is a drop-in backend
 that draws the same distribution (a correctness check, not an advantage).
 """
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import argparse
 import json
 import time
-from pathlib import Path
 
 import numpy as np
 

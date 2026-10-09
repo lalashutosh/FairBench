@@ -10,8 +10,12 @@ fairbench/ingest/sic.py for what it does and does not catch.
 """
 from __future__ import annotations
 
-import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
+import argparse
 
 import pandas as pd
 

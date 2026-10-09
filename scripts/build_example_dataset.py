@@ -10,9 +10,13 @@ be run and tested offline, and checked against values that are known because the
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import hashlib
 import json
-from pathlib import Path
 
 from fairbench.ingest.nport_synth import example_history
 

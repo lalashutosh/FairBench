@@ -20,9 +20,13 @@ Outputs: results/real_fund_<name>_quantum.csv and .json.
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import argparse
 import json
-from pathlib import Path
 
 import numpy as np
 import pandas as pd

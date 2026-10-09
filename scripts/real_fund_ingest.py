@@ -16,9 +16,13 @@ under data/nport/<series>/ for scripts/real_fund_attribution.py. data/ is git-ig
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import argparse
 from datetime import date
-from pathlib import Path
 
 from fairbench.ingest.archive import RawArchive
 from fairbench.ingest.http import SecClient

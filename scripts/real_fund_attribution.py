@@ -26,9 +26,13 @@ decomposition and a percentile is not evidence of skill; the JSON carries the ca
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import argparse
 import json
-from pathlib import Path
 
 import pandas as pd
 

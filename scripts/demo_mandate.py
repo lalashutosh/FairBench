@@ -14,10 +14,15 @@ flags, countries, extra fields), Gaussian returns with a planted rally in carbon
 annual return per standard deviation of the carbon figure), and a rule-abiding fund planted
 at a known rank (``--rank``). No real fund or mandate is analysed.
 """
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import argparse
 import json
 import time
-from pathlib import Path
 
 import numpy as np
 

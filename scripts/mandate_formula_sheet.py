@@ -13,8 +13,12 @@ under the name given by --reviewer; nothing is enforced without one.
 """
 from __future__ import annotations
 
-import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
+import argparse
 
 from fairbench.ingest.documents import parse_text
 from fairbench.instances import named_universe

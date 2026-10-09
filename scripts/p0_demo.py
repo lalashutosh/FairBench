@@ -1,4 +1,10 @@
 """P0 demo: Dicke(p=0)+filter vs rejection vs MCMC vs classical, on a toy universe."""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from any folder, installed or not
+
 import argparse
 import itertools
 import math
