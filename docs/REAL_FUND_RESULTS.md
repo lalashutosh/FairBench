@@ -40,7 +40,7 @@ the typical portfolio that follows the same rules.
   an index that a few very large companies drove. The fund's picks did 30 points better than the typical
   portfolio its rules allowed.
 
-![Parnassus Core Equity Fund against the index and the typical rule-abiding portfolio](results/real_fund_parnassus_core_equity.png)
+![Parnassus Core Equity Fund against the index and the typical rule-abiding portfolio](../results/real_fund_parnassus_core_equity.png)
 
 **What must be said with it.**
 
@@ -129,7 +129,7 @@ noiseless **simulation** and counts oracle queries, not time. One query is one c
 ## Repeat it
 
 The commands are in `README.md` under "Real funds from public filings". Another fund needs its SEC series id and
-an index fund that reports on the same months (`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md` lists candidates).
+an index fund that reports on the same months (`RESEARCH.md`, Part B, lists candidates).
 
 ## Checks against known answers
 

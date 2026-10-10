@@ -10,7 +10,7 @@ response under data/raw before parsing it, never re-downloads a filing it alread
 only ever contacts www.sec.gov and data.sec.gov.
 
 --series takes EDGAR series ids. S000000856 is Parnassus Core Equity and S000004310 is
-iShares Core S&P 500 (the parent-universe proxy); FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md
+iShares Core S&P 500 (the parent-universe proxy); docs/RESEARCH.md (Part B)
 lists the others. Output: data/fairbench.sqlite, data/raw/ and one XML per report date
 under data/nport/<series>/ for scripts/real_fund_attribution.py. data/ is git-ignored.
 """

@@ -15,7 +15,7 @@ and once, for the last quarter: how the query counts change with the precision a
 and the logical size of the circuit for the full universe.
 
 Everything quantum here is a noiseless SIMULATION and counts oracle queries, not time. It
-supports no claim of a speedup on any existing machine; see QUANTUM_CORE.md.
+supports no claim of a speedup on any existing machine; see docs/QUANTUM_CORE.md.
 Outputs: results/real_fund_<name>_quantum.csv and .json.
 """
 from __future__ import annotations

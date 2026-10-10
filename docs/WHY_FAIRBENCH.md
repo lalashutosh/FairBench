@@ -1,7 +1,7 @@
 # Why FairBench: judging a fund against the rules it was given
 
 _The argument behind the project, in plain words. Numbers come from the files named beside them; the
-short version is in [`README.md`](README.md)._
+short version is in [`README.md`](../README.md)._
 
 ## The one-minute version
 
@@ -119,7 +119,7 @@ What we measured ([`QUANTUM_CORE.md`](QUANTUM_CORE.md), noiseless simulation, qu
 ## What a real quantum computer said
 
 We ran the constraint-preserving circuit on VTT's 50-qubit Q50 through LUMI
-([`Q50_RESULTS.md`](Q50_RESULTS.md)).
+([`QUANTUM_CORE.md`](QUANTUM_CORE.md), section 13).
 
 - It works at small depth: with 4 assets it output valid portfolios 54% of the time, against 37.5% for
   random bits.
@@ -167,7 +167,7 @@ against mandates with ESG, carbon, sector or tracking-error rules. That review i
 With the institution's own mandate documents and holdings, the proxy rules above become the real ones,
 and the report says what the mandate cost, where the manager ranked inside it, and which rules could
 not be checked. Buyers, vendors and regulations are covered, with sources, in
-[`FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md`](FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md).
+[`RESEARCH.md`](RESEARCH.md), Part A.
 
 ## References
 

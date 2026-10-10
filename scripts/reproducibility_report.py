@@ -1,4 +1,4 @@
-"""Write REAL_FUND_RESULTS.md: what the real-fund run found, in plain words, with its checks.
+"""Write docs/REAL_FUND_RESULTS.md: what the real-fund run found, in plain words, with its checks.
 
     .venv/bin/python scripts/real_fund_attribution.py --example
     .venv/bin/python scripts/validate_reference.py
@@ -161,7 +161,7 @@ the typical portfolio that follows the same rules.
   an index that a few very large companies drove. The fund's picks did {fund - typ:.0f} points better than the typical
   portfolio its rules allowed.
 
-![{summ['fund']} against the index and the typical rule-abiding portfolio](results/real_fund_{name}.png)
+![{summ['fund']} against the index and the typical rule-abiding portfolio](../results/real_fund_{name}.png)
 
 **What must be said with it.**
 
@@ -195,7 +195,7 @@ at the fund's own largest position). "Exclusions' effect" is how much the exclus
 ## Repeat it
 
 The commands are in `README.md` under "Real funds from public filings". Another fund needs its SEC series id and
-an index fund that reports on the same months (`FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md` lists candidates).
+an index fund that reports on the same months (`RESEARCH.md`, Part B, lists candidates).
 """
 
 
@@ -260,8 +260,8 @@ this table shows the outputs are correct, not that anything is faster.
 | **Missing** | Dividends. Returns of securities that left both index funds. Sector labels. Trades inside a quarter. |
 | **Not reproducible from public data** | Any rule that depends on a vendor ESG rating, a provider's emissions data or a manager's internal score. Stored with its evidence, marked unobservable, never enforced. |
 """
-    (ROOT / "REAL_FUND_RESULTS.md").write_text(text)
-    print(f"wrote REAL_FUND_RESULTS.md ({len(text.splitlines())} lines, {len(text) // 1024} KB)")
+    (ROOT / "docs" / "REAL_FUND_RESULTS.md").write_text(text)
+    print(f"wrote docs/REAL_FUND_RESULTS.md ({len(text.splitlines())} lines, {len(text) // 1024} KB)")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 ``real_fund.build_period_case`` turns two filings into a ``PeriodCase`` (universe, returns,
 the fund's portfolio). The classical path draws portfolios and counts how many the fund
-beat. This module hands the SAME case to the quantum core (``QUANTUM_CORE.md``): the fund's
+beat. This module hands the SAME case to the quantum core (``docs/QUANTUM_CORE.md``): the fund's
 return goes into the oracle as a threshold and the rank is one amplitude,
 
     a_G = share of valid k-stock portfolios whose return is below the fund's.

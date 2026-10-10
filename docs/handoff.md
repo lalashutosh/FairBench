@@ -10,14 +10,14 @@ _Last updated 2026-10-10. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 - **Core** (synthetic data): sampling engine, selection rules, attribution app, AI mandate layer, the quantum studies.
 - **Real-fund layer:** SEC download, holdings database with provenance, universe and prices from filings, three reference distributions, regional rule check, formula sheet, weight-grid QUBO.
 - **Real results:** Parnassus Core Equity in depth (`REAL_FUND_RESULTS.md`, generated) and a nine-fund table (`scripts/skill_table.py`, `results/skill_table/`).
-- **Quantum:** amplitude estimation of the rank in simulation (`QUANTUM_CORE.md`) and a run on VTT Q50 with a digital twin (`Q50_RESULTS.md`).
+- **Quantum:** amplitude estimation of the rank in simulation (`QUANTUM_CORE.md`) and a run on VTT Q50 with a digital twin (`QUANTUM_CORE.md`).
 
-**Documentation pass, 2026-10-10.** `README.md` was rewritten around the problem, the solution, what is new, the results and the limits. `WHY_FAIRBENCH.md` is new: the argument in plain words. `BUILD_PLAN.md` and `PITCH_PLAN.md` were deleted; the architecture is now in the README, and the study results, reviewed wording and the list of claims we do not make are in `QUANTUM_CORE.md` sections 11 and 12. The wave-by-wave build log is in git history (`git show cd90c94:BUILD_PLAN.md`).
+**Documentation layout, 2026-10-10.** The repo root holds one markdown file, `README.md`, written for a first-time reader. Everything else is in `docs/`: this file, `WHY_FAIRBENCH.md`, `REAL_FUND_RESULTS.md` (generated), `QUANTUM_CORE.md` (method, earlier studies in §11, what may be claimed in §12, the VTT Q50 run in §13) and `RESEARCH.md` (Part A market and standards, Part B data sources). The old `BUILD_PLAN.md`, `PITCH_PLAN.md`, `Q50_RESULTS.md` and the two research memos were merged into those or deleted; originals are in git history before commit `e84a985`.
 
-**Two Parnassus numbers, both correct.** `REAL_FUND_RESULTS.md` gives an average rank of 54 (capped benchmark-proportional weights, exclusion list, 5,000 draws). The nine-fund table gives 50.4 (uncapped index weights, no exclusions, 20,000 draws, split-adjusted universe prices). Both are inside the luck band. Say which one a number comes from.
+**Two Parnassus numbers, both correct.** `REAL_FUND_RESULTS.md` gives an average rank of 54 (capped benchmark-proportional weights, exclusion list, 5,000 draws). The nine-fund table gives 50.4 (uncapped index weights, no exclusions, 20,000 draws, universe prices from the CSV export, split-adjusted inside `scripts/skill_table.py`). Both are inside the luck band. The Parnassus pipeline reads the filings' XML and handles splits itself; only the CSV export in `results/real_data/` lacks split adjustment. Say which one a number comes from.
 
 **Do next.**
-1. **Real rules by hand:** the team writes a real fund's rule spec; then wire it into `scripts/real_fund_attribution.py` in place of the proxy exclusion list (`run_period` already accepts `selection_rules` and `weight_rules`). How to hand one over: `README.md` → "Real funds from public filings", last paragraph.
+1. **Real rules by hand:** the team writes a real fund's rule spec: policy text as `<name>.txt`, spec beside it as `<name>.rules.json` (`examples/mandate_example.rules.json` is a complete example), then `scripts/mandate_formula_sheet.py --mandate <name>.txt --region US --reviewer "<name>"`. Then wire the enforced rules into `scripts/real_fund_attribution.py` in place of the proxy exclusion list (`run_period` already accepts `selection_rules` and `weight_rules`).
 2. **One pipeline for both real-fund results:** `scripts/skill_table.py` reads the CSV export in `results/real_data/` and has its own split adjustment; `apps/real_fund.py` reads the database. Merge them.
 3. **After the event:** more funds and quarters; a licensed ESG source; verified regional texts (most thresholds in `mandates/regions.py` are marked unverified); amplitude estimation over weights.
 
@@ -25,13 +25,11 @@ _Last updated 2026-10-10. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 
 | File | Open it when |
 |---|---|
-| `README.md` | the overview, headline results, setting up, running demos, using the API, finding a module |
+| `README.md` (repo root) | the overview, headline results, setting up, running demos |
 | `WHY_FAIRBENCH.md` | you need the argument: the problem, why existing tools miss it, why quantum fits |
 | `REAL_FUND_RESULTS.md` | you need the Parnassus numbers, their checks, or what is disclosed / derived / assumed |
-| `QUANTUM_CORE.md` | anything about the quantum estimator: how it works, what it can encode, where it does not help, the earlier studies (§11), what may be claimed (§12) |
-| `Q50_RESULTS.md` | the hardware run: results, digital twin, job ids, how to reproduce |
-| `FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md` | adding a fund or a data source: SEC sources, fund identifiers, data gaps, licensing |
-| `FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md` | questions about the market, competitors, GIPS / SFDR / SEC rules |
+| `QUANTUM_CORE.md` | anything quantum: how the estimator works, what it can encode, where it does not help, the earlier studies (§11), what may be claimed (§12), the hardware run with job ids (§13) |
+| `RESEARCH.md` | Part A: market, competitors, GIPS / SFDR / SEC rules. Part B: SEC sources, fund identifiers, data gaps, licensing |
 
 **Decisions taken by the assistant that the team has not confirmed.**
 - Real-fund layer: the SEC contact comes from the environment variable `FAIRBENCH_SEC_USER_AGENT` (the user's email was used at their request and is in no committed file); returns are price returns derived from filings; the headline reference is random same-size portfolios with benchmark-proportional weights capped at the fund's largest position; the exclusion list is a stand-in from SEC industry codes; new code says "within-mandate return difference" and "realised portfolio percentile", while `apps/attribution.py` still says "manager effect".
@@ -42,7 +40,7 @@ _Last updated 2026-10-10. Repo: `https://github.com/lalashutosh/FairBench.git`. 
 - No live model call has ever been made. The mandate layer is tested with a fake client.
 - Real funds: proxy rules only; a fund's own ESG screen cannot be reproduced from public data; no dividends; the latest date is two months behind.
 - Quantum: no advantage on hardware. The oracle encodes linear rules; minimum-groups and the two risk caps are not encodable; the penalty Hamiltonian covers the original five rules. `fairbench.backends.sample` still runs on simulators only; the hardware call lives in `scripts/hw_q50.py`.
-- `REAL_FUND_RESULTS.md` is generated: change `scripts/reproducibility_report.py`, never the file.
+- `docs/REAL_FUND_RESULTS.md` is generated: change `scripts/reproducibility_report.py`, never the file.
 
 **Working agreements.** Work directly on `main`. Push only when asked. Create a branch only when asked. Sonnet subagents may be used for well-specified work. Keep every claim inside `QUANTUM_CORE.md` §5 and §12. Update this file at the end of each session and keep it short: detail belongs in the files above.
 

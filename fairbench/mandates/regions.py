@@ -8,7 +8,7 @@ constraints (``constraint_type = "regulatory"``), and checks a fund's extracted 
 against them: is each regional requirement matched, exceeded, weaker, or not mentioned?
 
 Every rule carries its citation and a ``verified`` flag. The packs were written from the
-regulations as summarised in ``FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md`` and from memory
+regulations as summarised in ``docs/RESEARCH.md`` (Part A) and from memory
 of the legal texts; a rule with ``verified = False`` has NOT been re-read against the
 official text and is stored with status "assumed". Nothing here is legal advice, and a
 "consistent" verdict is a statement about the documents, not a compliance certificate.

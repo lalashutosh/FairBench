@@ -123,7 +123,7 @@ def main() -> None:
         f"the real circuit: about {rs['logical_qubits']:,} error-corrected qubits, {rs['t_gates_per_step']:.0e} T gates per step: "
         "beyond today's machines",
     ])
-    stage("5  REPORT", [f"figure:   {d['figure']}", "write-up: REAL_FUND_RESULTS.md",
+    stage("5  REPORT", [f"figure:   {d['figure']}", "write-up: docs/REAL_FUND_RESULTS.md",
                         "proxy rules, price returns without dividends, one fund; a rank is not proof of skill"])
 
 
