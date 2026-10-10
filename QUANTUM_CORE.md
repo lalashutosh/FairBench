@@ -1,6 +1,6 @@
 # FairBench quantum core: how it works, where the advantage is, how to plug into it
 
-_Written 2026-10-09. Audience: teammates building or connecting the classical layers (data, mandates, real-fund pipeline) and anyone answering quantum questions in the pitch. Numbers come from `results/qae_*`. Full study log: `BUILD_PLAN.md` → "QA results". Reviewed pitch wording and the "must not say" list are there too._
+_Written 2026-10-09, updated 2026-10-10 with the hardware run. For anyone building on the quantum estimator or checking a quantum claim. Numbers come from `results/qae_*`, `results/aa_*`, `results/q2_*` and `results/hw/`. The earlier studies that found no advantage are in section 11; the reviewed wording of what may be claimed is in section 12._
 
 ---
 
@@ -93,7 +93,7 @@ classical inputs (universe, rules, fund, returns)
 | **Swap-MCMC** (walk between legal portfolios) | Tight rules split the legal set into islands (14–19 at P_F ≤ 0.23%). Chains get trapped, with 90%-of-runs errors of 0.26–0.43. Correlated samples cost extra. | Connected legal sets: it matches QAE's 1/√P_F scaling there, and only the precision gain remains. |
 | **Exact counting** (dynamic programming over sectors and binned sums) | The state space explodes with three or more weighted rules (ESG, carbon, return): about 1.5e12 cells for a guaranteed ±1 point at n = 100. The example mandate needs over 10¹⁶. | One or two weighted rules: cheap and exact. |
 | **Exhaustive enumeration** | C(n,k) is astronomical (C(500,36) ≈ 10⁵⁵). | Tiny universes only. |
-| **Optimisers** (MILP, QUBO, annealing) | Answer a different question: they find one portfolio, not a ranking (see `PITCH_PLAN.md` Q&A). | — |
+| **Optimisers** (MILP, QUBO, annealing) | Answer a different question: they find one portfolio, not a ranking. | — |
 
 Not tested: importance sampling and quasi-Monte Carlo. A reviewer may raise them; neither removes the 1/ε² precision cost of sampling.
 
@@ -106,8 +106,8 @@ Not tested: importance sampling and quasi-Monte Carlo. A reviewer may raise them
 - **Loose rules.** For the whole attribution at P_F ≥ 10%, classical is at parity or better.
 - **Hardware today.**
   - One Grover step at n = 16 is about 1.7e4 two-qubit gates on 74 qubits.
-  - An advantage needs two-qubit error rates around 1e-6; today's devices are around 1e-3.
-  - The signal dies before one step.
+  - An advantage needs two-qubit error rates around 1e-6. The best devices today are around 1e-3; we measured about 2e-2 on VTT Q50.
+  - The signal dies before one step. On Q50, about 18% of it survived one step of a 4-asset toy (`Q50_RESULTS.md`).
 - **Fault-tolerant wall-clock.** Each quantum query takes about 0.1–1 s against about 2 µs classically. At ±1 point that is at least 8,000× slower, and there is no break-even at any useful precision.
 - **Non-linear statistics and rules** (section 6.4).
 
@@ -224,7 +224,7 @@ Proxy mandate: hold 36 stocks, 27 companies excluded, S&P 500 universe.
 | Amplitude estimation at small n | Exact state-vector Grover in the weight-k subspace |
 | Amplitude estimation at large n | Simulated from exact or Monte Carlo amplitudes (binomial shots). Exact for an ideal noiseless device; no circuits simulated |
 | Noise | Gate counts transpiled at n = 6–16; decay model checked against an Aer density-matrix simulation at n = 4 (the model is about 2× pessimistic) |
-| Hardware | **Not run yet.** VTT Q50 / Aalto Q20 via LUMI and 10 minutes of IBM are available. Plan: Dicke-state fidelity and Grover-signal decay for a "measured hardware gap" slide |
+| Hardware | **Run on VTT Q50 through LUMI, 2026-10-09.** Dicke-state validity at 4, 6 and 8 assets, toy amplitude estimation at 4 assets, and a digital twin fitted to the data. Above chance, no advantage: `Q50_RESULTS.md` |
 | Tests | `tests/test_qae_*.py`, `tests/test_oracle*.py`, `tests/test_exact_count.py` (part of the full suite, offline) |
 
 ---
@@ -243,15 +243,70 @@ Proxy mandate: hold 36 stocks, 27 companies excluded, S&P 500 universe.
 | `fairbench/qae/demo_bridge.py` | Exact / classical / quantum side by side |
 | `fairbench/quantum/encoding.py` | Stage 2 weight grid as a QUBO, with annealing and amplitude amplification (sampling; separate from QAE) |
 | `scripts/demo_qae.py` | 2-second demo: loose vs tight rules |
+| `scripts/hw_q50.py`, `hw_q50_analyze.py`, `hw_twin.py` | The VTT Q50 run, its noise-aware fit and the digital twin |
 | `scripts/qae_*.py` | Studies (scaling, hybrid, mandate, noise, break-even, DP, pitch figure) |
-| `results/qae_pitch_figure.png` | The slide |
+| `results/qae_hybrid_pitch.png`, `results/qae_pitch_figure.png` | Figures: whole-attribution queries against rule tightness; percentile error against queries |
 
 ---
 
 ## 10. Open items
 
-1. Hardware characterisation on VTT Q50, Aalto Q20 and IBM (Dicke-state fidelity, Grover-signal decay).
+1. Hardware characterisation on a second device (Aalto Q20, IBM). VTT Q50 is done (`Q50_RESULTS.md`).
 2. Helper for the value-weighted threshold. The maths works today via `LinearThreshold`; a small wrapper plus a test would make it one call for `apps/real_fund.py`.
 3. QAE over the Stage 2 weight grid: amplitude estimation on top of amplitude amplification on the QUBO encoding. Feasible in principle, not built.
 4. Oracles for `MinGroups` and the quadratic risk caps: new circuitry; currently enforced classically.
 5. Untested classical baselines: importance sampling, quasi-Monte Carlo, quantum-walk-accelerated MCMC.
+
+---
+
+## 11. Earlier studies: quantum sampling, and why we moved to estimation
+
+Before amplitude estimation, four ways of *generating* rule-abiding portfolios with a quantum circuit were benchmarked against classical baselines. None gave an advantage. They are kept because they are the reason the core estimates instead of samples.
+
+| Study | Setup | Result | Files |
+|---|---|---|---|
+| Dicke state + filter | Measure the Dicke state, keep the valid portfolios | Same distribution as classical rejection sampling (two-sample KS p = 0.24 at n = 16), same cost per valid sample | `scripts/demo_attribution.py`, `results/attribution_samplers.csv` |
+| Trained layers | XY-mixer ansatz trained with COBYLA / SPSA to raise acceptance | Acceptance 0.24 → 0.32 on a toy case; samples are no longer uniform; negligible gain on the island instance | `scripts/p1_ablation.py`, `results/ablation*` |
+| Simulability | Matrix-product-state simulation of the circuit | Bond dimension grows fast with depth: the circuit is not trivially simulable. Not an advantage claim | `scripts/p1_mps_sweep.py`, `results/mps_*` |
+| Quantum-enhanced MCMC | Proposal = time evolution under an XY + penalty Hamiltonian; exact spectral gaps, n ≤ 16, parameters tuned on five seeds and reported on held-out seeds | Per step it beats penalty-blind chains 9–19×, but a classical continuous-time walk given the same feasibility diagonal does better (gap ratio 0.42–0.84). Per unit cost it is 100–1000× worse | `scripts/q_gap_sweep2.py`, `results/q2_*` |
+| Amplitude amplification | Fault-tolerant resource estimate of exactly uniform sampling over the feasible set | Table below | `scripts/aa_estimate.py`, `results/aa_*` |
+
+**Amplitude amplification, per sample** (synthetic rule family, seed-median P_F, known schedule):
+
+| n | P_F | Grover iterations | Logical qubits | T gates per sample | Quantum s per sample (optimistic) | Classical s per sample (1 core) | Quantum ÷ classical |
+|---|---|---|---|---|---|---|---|
+| 50 | 0.176 | 1 | 112 | 1.2e5 | 0.071 | 5.5e-6 | 1.3e4 |
+| 100 | 0.073 | 2 | 197 | 8.3e5 | 0.27 | 2.7e-5 | 1.0e4 |
+| 150 | 0.047 | 3 | 297 | 2.6e6 | 0.60 | 7.5e-5 | 8.0e3 |
+| 200 | 0.032 | 4 | 397 | 6.1e6 | 1.1 | 1.2e-4 | 8.7e3 |
+
+- Dicke-state preparation is 85–92% of the T count; the oracle is about 120–130·n Toffolis at 11 bits.
+- The oracle uses integer thresholds rounded so that no valid portfolio is ever rejected (zero false negatives at n = 50–200), and a float check after measurement removes the extras, so samples are exactly uniform.
+- Break-even against one classical core needs P_F below about 2e-10 (optimistic) to 2e-12 (moderate); against 64 cores, below 1e-12. The synthetic family sits at 0.01–0.2.
+
+**Details of the amplitude-estimation studies not stated above** (`results/qae_*`, synthetic data, noiseless):
+
+- **Estimators.** IQAE is the robust choice: its 95th-percentile error reaches ±1 point on every tight case. MLAE has a better median but its error tail does not reach ±1 point at P_F ≤ 0.72%.
+- **Medians.** The two medians use a hybrid estimator: about 10 valid classical samples (charged) give a first empirical distribution, then amplitude estimation refines it on a monotone fit, with a charged bisection fallback. At least 98.5% of runs converge.
+- **Accounting.** A shot after m Grover steps is charged m + 1 queries. A classical query is one proposed portfolio.
+- **Example mandate** (n = 150, k = 20, P_F 0.55%): 7–20× fewer queries than rejection sampling and 1.8–5× fewer than MCMC, assuming an oracle for all of its rules. The sub-mandate the oracle can encode today (P_F 0.68%) gives 7–25× and 2.6–9.3×, with an oracle of 2.6e4 Toffolis on 391 logical qubits.
+- **Noise.** One Grover step at n = 16 is about 1.7e4 two-qubit gates (4.4e4 after heavy-hex routing) on 74 qubits. The error-rate requirement tightens with size roughly as n^−1.4 to n^−1.9.
+- **Fault-tolerant time.** No break-even at any precision down to 1e-4 (measured) or 1e-5 (extrapolated), in any of 96 configurations.
+- **Exact counting.** With one or two weighted rules a dynamic programme is cheap and exact. A guaranteed ±1 point with three weighted rules needs about 1.5e12 cells at n = 100; the encodable example mandate needs at least 2.6e16.
+
+---
+
+## 12. What may be claimed
+
+**Reviewed wording:**
+
+> The attribution percentile is a ratio of two amplitudes. In noiseless simulation on synthetic data, quantum amplitude estimation over our constraint-preserving circuit reaches a given percentile precision with quadratically fewer oracle queries than classical sampling (error ∝ 1/queries vs 1/√queries). Against rejection sampling the gap widens as mandates tighten. On the tightest rule sets the feasible portfolios split into disconnected islands that trap swap-MCMC; amplitude estimation does not depend on that connectivity. On the example mandate, assuming an oracle for all of its rules, the percentile needs roughly 7–20× fewer queries than rejection sampling at ±1 percentile point. For the full attribution (percentile plus both medians, with a classical warm start for the medians) the gain is about 2× at a 3% feasible fraction and 4–16× on tighter rules (parity or a small loss on loose rules), and 2–9× over swap-MCMC. It is a fault-tolerant-era result: on today's noisy devices the circuit (about 17k two-qubit gates per step at 16 assets) would need two-qubit error rates of order 1e-6 for any advantage, and even fault-tolerant wall-clock time does not beat a laptop at analyst precision.
+
+**Claims this work does not support, and we do not make:**
+
+- A quantum speedup for attribution. The result is fewer queries, not less time.
+- "The advantage grows as mandates tighten", without "against rejection sampling, or where MCMC is trapped".
+- A break-even precision at which the quantum estimator wins in wall-clock time. None was found.
+- A single "N× fewer" figure without its range and its scope (percentile only, or whole attribution).
+- A quantum advantage on VTT Q50, or that Q50 estimated a rank correctly.
+

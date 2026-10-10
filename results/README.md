@@ -8,6 +8,10 @@ The other files directly under `results/` include historical synthetic demos,
 regression fixtures, and individual experiment outputs. They are retained for
 tests and reproducibility, but must not be presented as scraped market data.
 
+`skill_table/` holds the nine-fund table built from `real_data/` by
+`scripts/skill_table.py`, and its figures. `hw/` holds the raw counts, job ids
+and fits of the VTT Q50 hardware run and its digital twin (`Q50_RESULTS.md`).
+
 Use `real_data/real_data_validation.json` before running a model. The validator
 checks provenance, duplicates, positive derived prices, reproducible returns,
 and zero/synthetic-value contamination. External Yahoo close prices are a
