@@ -154,7 +154,7 @@ def main():
         save(out, RES / "demo_qae_tight.json", t0)
     print("Caveats: noiseless simulation of ideal amplitude estimation, not hardware;")
     print("  synthetic data with planted truth; query counts are oracle calls, not wall-clock")
-    print("  (see BUILD_PLAN QA results for where the quantum count does and does not win).")
+    print("  (see QUANTUM_CORE.md for where the quantum count does and does not win).")
     print(f"total {time.time() - t0:.1f}s")
 
 

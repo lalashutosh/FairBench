@@ -5,7 +5,7 @@ comes from, which funds are candidates and their SEC identifiers, what public da
 calendar, licensing risks, and how Europe would fit. Section numbers have gaps because the design sections of the
 original memo were removed once the design was built._
 
-**Where the rest went.** Results and checks: [`REAL_FUND_RESULTS.md`](REAL_FUND_RESULTS.md). Database schema:
+**Where the rest went.** Results and checks: [`REAL_FUND_RESULTS.md`](REAL_FUND_RESULTS.md); the nine-fund table: `results/skill_table/`. Database schema:
 `fairbench/store/schema.sql`. Constraint format and hard/soft wording: `fairbench/mandates/`. Reference
 distributions and the weight grid: `fairbench/portfolio/reference.py`, `weights.py`. Period logic and labels:
 `fairbench/apps/real_fund.py`. Quantum encoding: `fairbench/quantum/encoding.py`. Each module's docstring states its contract.

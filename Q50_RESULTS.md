@@ -1,17 +1,17 @@
-# VTT Q50 hardware run: results, conclusions, slide material
+# FairBench on a real quantum computer: the VTT Q50 run
 
 _Run 2026-10-09 on VTT Q50 through LUMI (event module `fiqci-vtt-qiskit-QxF`, project `project_462001763`). Every number below comes from `results/hw/`. Scripts: `scripts/hw_q50.py` (runs), `scripts/hw_q50_analyze.py` (fit and figure), `scripts/hw_twin.py` (digital twin)._
 
 ---
 
-## 1. Slide-ready lines (pick one or two)
+## 1. Summary
 
-- **"We ran FairBench's quantum circuit on VTT's 50-qubit computer through LUMI."**
-- **"It produced valid portfolios 54% of the time, against 37.5% by chance."**
-- **"But every two-qubit gate costs signal. One amplitude-estimation step (~150 gates) erases most of it."**
-- **"A digital twin calibrated on our hardware data (on LUMI) shows the toy problem works at ~0.1% gate error; real portfolio sizes need ~0.00001%. That's fault-tolerant hardware."**
+- FairBench's constraint-preserving circuit ran on VTT's 50-qubit Q50 through LUMI.
+- It produced valid portfolios 54% of the time, against 37.5% by chance.
+- Every two-qubit gate costs signal. One amplitude-estimation step (about 150 gates) erases most of it.
+- A digital twin calibrated on the hardware data shows the toy problem working at about 0.1% gate error; real portfolio sizes need about 0.00001%. That is fault-tolerant hardware.
 
-**One-sentence version:** *"Our circuit runs on real hardware and beats chance, and the measured noise tells us exactly what hardware the quantum advantage needs."*
+**In one sentence:** the circuit runs on real hardware and beats chance, and the measured noise says what hardware the quantum advantage needs.
 
 **Figures:**
 
@@ -19,7 +19,7 @@ _Run 2026-10-09 on VTT Q50 through LUMI (event module `fiqci-vtt-qiskit-QxF`, pr
 |---|---|
 | `results/hw/hw_q50.png` | Hardware: valid-portfolio share (left) and amplitude-estimation signal (right) |
 | `results/hw/hw_twin_lumi.png` | Twin reproduces Q50 (left), and what lower error rates would give (right) |
-| `results/qae_hybrid_pitch.png` | The main quantum slide: 12× fewer queries on tight rules (simulation) |
+| `results/qae_hybrid_pitch.png` | For comparison, the simulated result: 12× fewer queries on tight rules |
 
 ---
 
@@ -101,13 +101,13 @@ Sweep (LUMI run): signal surviving per Grover step, and the rank estimate.
 
 ---
 
-## 5. Things NOT to say
+## 5. What this run does not show
 
-- "Quantum advantage on Q50": there is none; the hardware run is a feasibility and characterisation result.
-- "Q50 estimated the fund's rank correctly": the fit gave 23–27% against an exact 33%, with an unreliable interval.
-- That the 12× (or any) query advantage was measured on hardware: it comes from noiseless simulation.
+- **A quantum advantage on Q50.** There is none; the run is a feasibility and characterisation result.
+- **That Q50 estimated the fund's rank correctly.** The fit gave 23–27% against an exact 33%, with an unreliable interval.
+- **That the 12× (or any) query advantage was measured on hardware.** It comes from noiseless simulation.
 
-## 6. Likely questions
+## 6. Questions and answers
 
 - **"Why so few qubits?"** Each extra two-qubit gate costs about 2% of the signal, so bigger circuits only return noise. The 4-asset toy is the largest that still shows signal.
 - **"What would it take?"** About a 10× better gate error to run the toy amplitude estimation properly, and about 10⁵× better (error correction) for real portfolio sizes.

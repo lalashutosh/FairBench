@@ -1,52 +1,52 @@
 # FairBench — handoff
 
-_Last updated 2026-10-09. Repo: `https://github.com/lalashutosh/FairBench.git`. This is the short entry point: read it, then open only the file the task needs (table below)._
+_Last updated 2026-10-10. Repo: `https://github.com/lalashutosh/FairBench.git`. This is the short entry point: read it, then open only the file the task needs (table below)._
 
 ## Start here
 
-**State.** Everything is on `main`. 1178 tests, all green, all offline: `OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q` (about a minute; run it in the background, a foreground call can time out).
+**State.** 1,184 tests, all green, all offline: `OMP_NUM_THREADS=4 .venv/bin/python -m pytest -q` (one to five minutes; run it in the background, a foreground call can time out).
 
-**What exists.**
-- **Core** (synthetic data): sampling engine, selection rules, attribution app, AI mandate layer, five quantum studies. Setup, usage and layout are in `README.md`.
-- **Real-fund layer** (2026-10-09): SEC download, holdings database with provenance, universe and prices from filings, three reference distributions, evidence-checked constraint format, weight-grid QUBO. How to run: `README.md` → "Real funds from public filings".
-- **Merged architecture** (2026-10-09): documents ─▶ rules ─▶ regional check ─▶ formula sheet ─▶ data ─▶ classical and quantum estimators on the same inputs ─▶ report. Diagram, what each estimator can take, and the plan: top of `BUILD_PLAN.md`. New code: `mandates/regions.py`, `mandates/formulas.py`, `apps/real_fund_quantum.py`, `scripts/mandate_formula_sheet.py`, `scripts/real_fund_quantum.py`.
-- **One real result:** Parnassus Core Equity against S&P 500 portfolios, 2019-09 to 2026-06, 27 quarters, from SEC filings only. Plain-language write-up, quarter table and checks: `REAL_FUND_RESULTS.md`. Slide figure: `results/real_fund_parnassus_core_equity.png`.
+**What exists.** `README.md` is the full overview, with every headline number and the file it comes from.
+- **Core** (synthetic data): sampling engine, selection rules, attribution app, AI mandate layer, the quantum studies.
+- **Real-fund layer:** SEC download, holdings database with provenance, universe and prices from filings, three reference distributions, regional rule check, formula sheet, weight-grid QUBO.
+- **Real results:** Parnassus Core Equity in depth (`REAL_FUND_RESULTS.md`, generated) and a nine-fund table (`scripts/skill_table.py`, `results/skill_table/`).
+- **Quantum:** amplitude estimation of the rank in simulation (`QUANTUM_CORE.md`) and a run on VTT Q50 with a digital twin (`Q50_RESULTS.md`).
 
-**The real result.** Price growth: fund +135%, S&P 500 index fund +149%, typical 36-stock portfolio under the same rules +105%. Average quarterly rank among rule-abiding portfolios: 54 of 100 (luck alone: 50 give or take 6). The exclusions cost about 2 points. It must always carry: *proxy rules (holdings count plus 27 companies excluded by SEC industry code), price returns without dividends, one fund, not a measure of skill.*
+**Documentation pass, 2026-10-10.** `README.md` was rewritten around the problem, the solution, what is new, the results and the limits. `WHY_FAIRBENCH.md` is new: the argument in plain words. `BUILD_PLAN.md` and `PITCH_PLAN.md` were deleted; the architecture is now in the README, and the study results, reviewed wording and the list of claims we do not make are in `QUANTUM_CORE.md` sections 11 and 12. The wave-by-wave build log is in git history (`git show cd90c94:BUILD_PLAN.md`).
 
-**Do next** (decided with the team on 2026-10-09; detail in `BUILD_PLAN.md` → "Plan from here").
-1. **Demo:** `scripts/demo_pipeline.py` shows the whole pipeline from committed results, for the recording.
-2. **Real rules by hand:** the team writes the real fund's rule spec with their own prompt or skill; no model call on the real prospectus. Once it exists, wire it into `scripts/real_fund_attribution.py` in place of the proxy exclusion list.
-3. **Hardware:** the teammate with LUMI access runs the small Dicke-state measurement from his own checkout (`BUILD_PLAN.md` → "Item 3").
-4. **Deck, script, Q&A sheet:** the team is working on them; not started in this repo (`PITCH_PLAN.md`, due Saturday 2026-10-10 09:30).
+**Two Parnassus numbers, both correct.** `REAL_FUND_RESULTS.md` gives an average rank of 54 (capped benchmark-proportional weights, exclusion list, 5,000 draws). The nine-fund table gives 50.4 (uncapped index weights, no exclusions, 20,000 draws, split-adjusted universe prices). Both are inside the luck band. Say which one a number comes from.
+
+**Do next.**
+1. **Real rules by hand:** the team writes a real fund's rule spec; then wire it into `scripts/real_fund_attribution.py` in place of the proxy exclusion list (`run_period` already accepts `selection_rules` and `weight_rules`). How to hand one over: `README.md` → "Real funds from public filings", last paragraph.
+2. **One pipeline for both real-fund results:** `scripts/skill_table.py` reads the CSV export in `results/real_data/` and has its own split adjustment; `apps/real_fund.py` reads the database. Merge them.
+3. **After the event:** more funds and quarters; a licensed ESG source; verified regional texts (most thresholds in `mandates/regions.py` are marked unverified); amplitude estimation over weights.
 
 **Where to look.**
 
 | File | Open it when |
 |---|---|
-| `README.md` | setting up, running demos, using the API, finding a module |
-| `REAL_FUND_RESULTS.md` | you need the real-fund numbers, their checks, or what is disclosed / derived / assumed |
-| `BUILD_PLAN.md` | you need the architecture and the plan (top section), or the detail and the "must not say" list behind a quantum number ("QA results") |
-| `QUANTUM_CORE.md` | anything about the quantum estimator: how it works, what it can encode, where it does not help |
-| `PITCH_PLAN.md` | working on the pitch: the deliverable (one pptx, 3 minutes), the jury's criteria, the task list, Saturday 09:30 deadline |
+| `README.md` | the overview, headline results, setting up, running demos, using the API, finding a module |
+| `WHY_FAIRBENCH.md` | you need the argument: the problem, why existing tools miss it, why quantum fits |
+| `REAL_FUND_RESULTS.md` | you need the Parnassus numbers, their checks, or what is disclosed / derived / assumed |
+| `QUANTUM_CORE.md` | anything about the quantum estimator: how it works, what it can encode, where it does not help, the earlier studies (§11), what may be claimed (§12) |
+| `Q50_RESULTS.md` | the hardware run: results, digital twin, job ids, how to reproduce |
 | `FAIRBENCH_REAL_DATA_RESEARCH_MEMO.md` | adding a fund or a data source: SEC sources, fund identifiers, data gaps, licensing |
 | `FAIRBENCH_INDUSTRY_STANDARDS_RESEARCH.md` | questions about the market, competitors, GIPS / SFDR / SEC rules |
 
 **Decisions taken by the assistant that the team has not confirmed.**
-- Real-fund layer: the SEC contact comes from the environment variable `FAIRBENCH_SEC_USER_AGENT` (the user's email was used at their request and is in no committed file); returns are price returns derived from filings; the headline reference is random same-size portfolios with benchmark-proportional weights capped at the fund's largest position; the exclusion list is a stand-in from SEC industry codes; new code says "within-mandate return difference" and "realised portfolio percentile", while `apps/attribution.py` and the deck still say "manager effect".
+- Real-fund layer: the SEC contact comes from the environment variable `FAIRBENCH_SEC_USER_AGENT` (the user's email was used at their request and is in no committed file); returns are price returns derived from filings; the headline reference is random same-size portfolios with benchmark-proportional weights capped at the fund's largest position; the exclusion list is a stand-in from SEC industry codes; new code says "within-mandate return difference" and "realised portfolio percentile", while `apps/attribution.py` still says "manager effect".
 - Core: the default benchmark is the median random portfolio of the same size; the model never sees per-asset values; shares and averages in a mandate are read as equal-weight statements; a holdings range is benchmarked at the fund's actual count; risk limits use the universe covariance with equal weights.
+- Documentation pass: the README lists Claude Code under "Resources used"; remove the line if the team prefers.
 
 **Gaps.**
-- No live model call has ever been made, and none is planned on the real prospectus: the team writes those rules by hand. The mandate layer is tested with a fake client.
-- Real funds: one fund only; the fund's own ESG screen cannot be reproduced from public data; no dividends; the latest date is two months behind.
-- Quantum: simulator only. The oracle encodes linear rules; minimum-groups and the two risk caps are not encodable; the penalty Hamiltonian covers the original five rules. Amplitude-estimation numbers are noiseless query counts on synthetic data, never a speedup.
-- Deck numbers (slides 4, 5, 9) must be updated by hand if a demo is re-run with other settings.
+- No live model call has ever been made. The mandate layer is tested with a fake client.
+- Real funds: proxy rules only; a fund's own ESG screen cannot be reproduced from public data; no dividends; the latest date is two months behind.
+- Quantum: no advantage on hardware. The oracle encodes linear rules; minimum-groups and the two risk caps are not encodable; the penalty Hamiltonian covers the original five rules. `fairbench.backends.sample` still runs on simulators only; the hardware call lives in `scripts/hw_q50.py`.
+- `REAL_FUND_RESULTS.md` is generated: change `scripts/reproducibility_report.py`, never the file.
 
-**Working agreements.** Work directly on `main`. Push only when asked. Create a branch only when asked. Sonnet subagents may be used for well-specified work. Keep every pitch claim inside `QUANTUM_CORE.md` §5 and the "must not say" list in `BUILD_PLAN.md` → "QA results". Update this file at the end of each session and keep it short: detail belongs in the files above.
+**Working agreements.** Work directly on `main`. Push only when asked. Create a branch only when asked. Sonnet subagents may be used for well-specified work. Keep every claim inside `QUANTUM_CORE.md` §5 and §12. Update this file at the end of each session and keep it short: detail belongs in the files above.
 
 ## Findings, one line each
-
-_Exact wording for the quantum findings: `QUANTUM_CORE.md`. The longer reviewed wording that used to be in this file is in git history (`git show 68d220a:PITCH_PLAN.md`)._
 
 1. Dicke state + filter draws the same distribution as classical rejection sampling: a correctness baseline, not an advantage.
 2. Trained layers raise acceptance slightly but leave the uniform distribution; training cost is not paid back.
@@ -55,8 +55,10 @@ _Exact wording for the quantum findings: `QUANTUM_CORE.md`. The longer reviewed 
 5. Amplitude amplification: about 10⁴ times slower than classical at n = 100–200; break-even needs a feasible fraction near 1e-9 to 1e-12.
 6. Attribution on synthetic data recovers a planted rank (69.3 ± 0.7 against 70).
 7. AI mandate layer on one fictional mandate: 14 of 18 rules enforced, 3 reported as not expressible; never run live.
-8. Amplitude estimation of the percentile: quadratically fewer queries in noiseless simulation, robust on fragmented tight mandates; no advantage on today's hardware and none in wall-clock time.
-9. Real fund (above): rank 54 of 100, rules cost about 2 points. The quantum estimator, simulated on the same quarters, gives the same rank and needs a median of 1,900 queries against 5,366 classical samples for ±1 point; every random draw is valid under these rules, so the gain is in precision only, and the circuit (about 949 error-corrected qubits) is beyond any current machine.
+8. Amplitude estimation of the percentile: quadratically fewer queries in noiseless simulation, 12× on the tightest rules, robust on fragmented mandates; no advantage on today's hardware and none in wall-clock time.
+9. Parnassus Core Equity: rank 54 of 100, rules cost about 2 points. The quantum estimator, simulated on the same quarters, gives the same rank with a median of 1,900 queries against 5,366 classical samples for ±1 point; the circuit (about 949 error-corrected qubits) is beyond any current machine.
+10. Nine real funds: all eight ESG funds inside the luck band, 0 extreme quarters in 198; the equal-weighted control is flagged in 13 of 26.
+11. VTT Q50: valid portfolios 54% against 37.5% by chance at 4 assets; signal mostly gone after one Grover step; a one-parameter twin (two-qubit error 1.8%) reproduces the data.
 
 ## Core conventions (don't break these)
 - A portfolio *selection* is a uint8 vector `x` of length n (`x[i] = 1` = asset i held). Every sampler returns an `(shots, n)` uint8 array, so all metrics work on any sampler. Weights come later via `postprocess.assign_weights`.

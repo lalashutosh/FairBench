@@ -2,6 +2,8 @@
 
 **Research date:** 8 October 2026
 
+**Status on 10 October 2026.** This report was written before the real-fund work and describes the repository as it was on 8 October. Three of its recommendations have since been acted on: the pipeline ran on nine real US funds from SEC filings (actions 7 and 8 in section 17; [`README.md`](README.md), [`REAL_FUND_RESULTS.md`](REAL_FUND_RESULTS.md)); weighted reference distributions and a holdings database with provenance were added (actions 3 to 5, in part); and the code now says "within-mandate return difference" where this report asks for it. Where the text below says no real fund has been analysed, read it as of 8 October. The comparison with FactSet's Cabot Reveal Plus (action 9) and the customer interviews (action 1) are still open.
+
 **Scope:** performance measurement and attribution, GIPS, standard/custom/mandate benchmarks, peer groups, ESG and carbon analytics, SFDR, ESMA and SEC fund-name rules, institutional manager oversight, and the specific gap FairBench may fill.
 
 ## 1. Executive verdict

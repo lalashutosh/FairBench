@@ -2,7 +2,7 @@
 
 Queries for the WHOLE attribution (percentile + null median + benchmark median, tol 0.01, typical run = e50) vs
 the feasible fraction P_F: classical rejection, swap-MCMC, hybrid (classical warm start + amplitude estimation).
-Cases where one rank step 1/|F| exceeds the tolerance (floor_1F) are left out, as in BUILD_PLAN.
+Cases where one rank step 1/|F| exceeds the tolerance (floor_1F) are left out, as in QUANTUM_CORE.md.
 Outputs results/qae_hybrid_pitch.{png,svg} at 16:9.
 """
 import json
